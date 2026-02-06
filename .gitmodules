@@ -7,3 +7,6 @@
 [submodule "Luxon"]
 	path = Luxon
 	url = https://gitlab.com/luxon_project/Luxon.git
+[submodule "vcpkg"]
+	path = vcpkg
+	url = https://github.com/microsoft/vcpkg
