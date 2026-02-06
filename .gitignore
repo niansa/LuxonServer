@@ -80,3 +80,7 @@ CMakeLists.txt.user*
 .rcc/
 .uic/
 /build*/
+
+# Files + Folders generated when using Visual Studio
+.vs
+out
