@@ -21,9 +21,6 @@ if (NOT LUXON_SERVER_ENABLE_PLUGINS AND NOT WIN32)
 endif()
 
 if (MSVC)
-    # Disable min/max macros when using MSVC
-    add_compile_definitions(NOMINMAX)
-
     # commoncpp gets compiled without ASAN and includes <vector>.
     # This causes issues during linking, so we have to turn it off.
     set(SANMAKE_ASAN OFF)
