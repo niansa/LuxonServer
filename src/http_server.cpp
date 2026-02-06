@@ -23,7 +23,6 @@
 #include <algorithm>
 #include <unordered_map>
 #include <fcntl.h>
-
 #include <luxon/http_parser.hpp>
 #include <luxon/ser_types.hpp>
 #include <luxon/enet_peer.hpp>
