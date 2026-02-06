@@ -18,6 +18,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <fcntl.h>
+
 #include <luxon/http_parser.hpp>
 #include <luxon/ser_types.hpp>
 #include <luxon/enet_peer.hpp>
@@ -309,11 +310,11 @@ void HttpServer::handle_client_data(HttpClient& client) {
         std::string_view content, content_type = "text/html";
         if (req.method == "GET") {
             if (req.path == "/") {
-                content = {incbin_index_html_start, static_cast<size_t>(reinterpret_cast<intptr_t>(incbin_index_html_end - incbin_index_html_start))};
+                content = {incbin_index_html_start, static_cast<size_t>(static_cast<intptr_t>(incbin_index_html_end - incbin_index_html_start))};
             } else if (req.path == "/stats") {
-                content = {incbin_stats_html_start, static_cast<size_t>(reinterpret_cast<intptr_t>(incbin_stats_html_end - incbin_stats_html_start))};
+                content = {incbin_stats_html_start, static_cast<size_t>(static_cast<intptr_t>(incbin_stats_html_end - incbin_stats_html_start))};
             } else if (req.path == "/style.css") {
-                content = {incbin_style_css_start, static_cast<size_t>(reinterpret_cast<intptr_t>(incbin_style_css_end - incbin_style_css_start))};
+                content = {incbin_style_css_start, static_cast<size_t>(static_cast<intptr_t>(incbin_style_css_end - incbin_style_css_start))};
                 content_type = "text/css";
             }
         }
