@@ -19,6 +19,15 @@ if (NOT LUXON_SERVER_ENABLE_PLUGINS AND NOT WIN32)
     add_compile_definitions(thread_local=)
 endif()
 
+# Disable min/max macros when using MSVC
+if (MSVC)
+    add_compile_definitions(NOMINMAX)
+
+    # commoncpp gets compiled without ASAN and includes <vector>.
+    # This causes issues during linking, so we have to turn it off.
+    set(SANMAKE_ASAN OFF)
+endif()
+
 option(LUXON_SERVER_USE_SPD_LOG "Use spd_log for Luxon server, if found" ON)
 if (LUXON_SERVER_USE_SPD_LOG)
     find_package(spdlog CONFIG)
