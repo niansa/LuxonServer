@@ -1,3 +1,9 @@
+#pragma once
+
+#if defined(_MSC_VER) && !defined(__llvm__)
+#pragma error "incbin.h is not supported on MSVC."
+#endif
+
 #define STR2(x) #x
 #define STR(x) STR2(x)
 

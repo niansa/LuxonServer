@@ -11,7 +11,12 @@
 #include "peer_persistence.hpp"
 #include "handler_base.hpp"
 #include "logger.hpp"
+
+#ifdef LUXON_USE_EMBED_RESOURCE
+#include <EmbeddedResource.h>
+#else
 #include "incbin.h"
+#endif
 
 #include <format>
 #include <charconv>
@@ -33,11 +38,20 @@
 #define CLOSE_SOCKET close
 #endif
 
+#ifdef LUXON_USE_EMBED_RESOURCE
+DECLARE_RESOURCE_COLLECTION(http_resources);
+DECLARE_RESOURCE(http_resources, index_html);
+DECLARE_RESOURCE(http_resources, stats_html);
+DECLARE_RESOURCE(http_resources, style_css);
+#define GET_RESOURCE(name) LOAD_RESOURCE(http_resources, name).data 
+#else
 extern "C" {
-INCBIN(index_html, SOURCE_DIR "/index.html");
-INCBIN(stats_html, SOURCE_DIR "/stats.html");
-INCBIN(style_css, SOURCE_DIR "/style.css");
+    INCBIN(index_html, SOURCE_DIR "/index.html");
+    INCBIN(stats_html, SOURCE_DIR "/stats.html");
+    INCBIN(style_css, SOURCE_DIR "/style.css");
 }
+#define GET_RESOURCE(name) {incbin_ ## name ## _start, static_cast<size_t>(reinterpret_cast<intptr_t>(incbin_ ## name ## _end - incbin_ ## name ## _start))} 
+#endif
 
 using json = nlohmann::json;
 using namespace luxon::ser;
@@ -310,11 +324,11 @@ void HttpServer::handle_client_data(HttpClient& client) {
         std::string_view content, content_type = "text/html";
         if (req.method == "GET") {
             if (req.path == "/") {
-                content = {incbin_index_html_start, static_cast<size_t>(static_cast<intptr_t>(incbin_index_html_end - incbin_index_html_start))};
+                content = GET_RESOURCE(index_html);
             } else if (req.path == "/stats") {
-                content = {incbin_stats_html_start, static_cast<size_t>(static_cast<intptr_t>(incbin_stats_html_end - incbin_stats_html_start))};
+                content = GET_RESOURCE(stats_html);
             } else if (req.path == "/style.css") {
-                content = {incbin_style_css_start, static_cast<size_t>(static_cast<intptr_t>(incbin_style_css_end - incbin_style_css_start))};
+                content = GET_RESOURCE(style_css);
                 content_type = "text/css";
             }
         }

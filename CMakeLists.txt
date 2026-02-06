@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(LUXON_SERVER_ENABLE_WEBSERVER "Enable the built-in webserver" ON)
 option(LUXON_SERVER_ENABLE_PLUGINS "Enable use of game plugins" OFF)
 option(LUXON_SERVER_POLL "Poll blindly instead of select with timeout, less efficient" OFF)
+option(LUXON_USE_EMBED_RESOURCE "Use EmbedResource instead of incbin.h" OFF)
 
 # Apply single-threaded optimizations if strictly single-threaded
 if (NOT LUXON_SERVER_ENABLE_PLUGINS AND NOT WIN32)
@@ -19,13 +20,16 @@ if (NOT LUXON_SERVER_ENABLE_PLUGINS AND NOT WIN32)
     add_compile_definitions(thread_local=)
 endif()
 
-# Disable min/max macros when using MSVC
 if (MSVC)
+    # Disable min/max macros when using MSVC
     add_compile_definitions(NOMINMAX)
 
     # commoncpp gets compiled without ASAN and includes <vector>.
     # This causes issues during linking, so we have to turn it off.
     set(SANMAKE_ASAN OFF)
+
+    # incbin.h is not supported on MSVC.
+    set(LUXON_USE_EMBED_RESOURCE ON)
 endif()
 
 option(LUXON_SERVER_USE_SPD_LOG "Use spd_log for Luxon server, if found" ON)
@@ -65,6 +69,13 @@ target_include_directories(luxon_server PRIVATE include/luxon/server PUBLIC incl
 
 if (MSVC)
     target_compile_definitions(luxon_server PUBLIC NOMINMAX)
+endif()
+
+if (LUXON_USE_EMBED_RESOURCE)
+    find_package(EmbedResource REQUIRED)
+    add_resource_library(luxon_server_resources OBJECT RESOURCE_COLLECTION_NAME http_resources RESOURCES "index.html;stats.html;style.css")
+    target_link_libraries(luxon_server luxon_server_resources)
+    add_compile_definitions(LUXON_USE_EMBED_RESOURCE)
 endif()
 
 if (LUXON_SERVER_POLL)
