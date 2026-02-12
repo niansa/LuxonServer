@@ -42,7 +42,7 @@ protected:
     common::Timer last_app_stats_;
     bool wants_app_stats_ = false;
 
-    std::shared_ptr<Lobby> get_requested_lobby(const ser::OperationRequestMessage& req);
+    std::expected<std::shared_ptr<Lobby>, ser::OperationResponseMessage> get_requested_lobby(const ser::OperationRequestMessage& req);
 
     void join_lobby(std::shared_ptr<Lobby> lobby);
     void leave_lobby() { joined_lobby_.reset(); }
