@@ -411,16 +411,15 @@ void MasterServerHandler::HandleOperationRequest(const ser::OperationRequestMess
 }
 
 std::expected<std::shared_ptr<Lobby>, ser::OperationResponseMessage> MasterServerHandler::get_requested_lobby(const ser::OperationRequestMessage& req) {
-    models::LobbyId params;
-    const auto resp = params.decode(req);
-    if (!resp)
-        return std::unexpected(resp.error());
-    const std::string& lobby_name = params.get<models::LobbyIdName>();
+    const auto lobby_id = models::LobbyId::decode(req);
+    if (!lobby_id)
+        return std::unexpected(lobby_id.error());
+    const std::string& lobby_name = lobby_id->get<models::LobbyIdName>();
 
     if (lobby_name.empty() && joined_lobby_)
         return joined_lobby_->lobby;
 
-    return peer_->persistent->app->get_lobby({params.get<models::LobbyIdName>(), params.get<models::LobbyIdType>()});
+    return peer_->persistent->app->get_lobby({lobby_id->get<models::LobbyIdName>(), lobby_id->get<models::LobbyIdType>()});
 }
 
 void MasterServerHandler::join_lobby(std::shared_ptr<Lobby> lobby) {
