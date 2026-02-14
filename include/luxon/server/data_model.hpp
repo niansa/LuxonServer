@@ -259,6 +259,31 @@ template <class V, ByteKeyEnum E, E K, bool Opt, class Def> struct IsParameterSp
 template <typename T>
 concept ParameterSpec = IsParameterSpecImpl<std::remove_cvref_t<T>>::value;
 
+namespace detail {
+// Select the ParameterSpec in Ps... whose wire_key matches Key (cast to uint8_t).
+template <auto Key, ParameterSpec... Ps> struct ParamByKey;
+
+template <auto Key> struct ParamByKey<Key> {
+    using type = void;
+};
+
+template <auto Key, ParameterSpec P0, ParameterSpec... Rest> struct ParamByKey<Key, P0, Rest...> {
+    static constexpr std::uint8_t k = static_cast<std::uint8_t>(Key);
+    using type = std::conditional_t<(P0::wire_key == k), P0, typename ParamByKey<Key, Rest...>::type>;
+};
+
+template <auto Key, ParameterSpec... Ps> using param_by_key_t = typename ParamByKey<Key, Ps...>::type;
+
+template <auto Key, ParameterSpec... Ps> inline constexpr std::size_t key_match_count_v = ((Ps::wire_key == static_cast<std::uint8_t>(Key)) + ... + 0);
+
+template <auto Key, typename... Ps>
+concept UniqueKeyInModel = requires {
+    requires(ParameterSpec<Ps> && ...);
+    requires(detail::key_match_count_v<Key, Ps...> == 1);
+    requires(!std::is_void_v<detail::param_by_key_t<Key, Ps...>>);
+};
+} // namespace detail
+
 // Forward declaration
 template <ParameterSpec... Ps> struct Model;
 
@@ -331,12 +356,12 @@ public:
     // Read-only access:
     // - required: const value_type&
     // - optional by-value: const std::optional<value_type>&
-    // - optional by-ref: const const value_type*
+    // - optional by-ref: const value_type*
     template <ParameterSpec P>
         requires((std::is_same_v<P, Ps>) || ...)
     decltype(auto) get() const {
         if constexpr (P::optional) {
-            return storage<P>() ? &*storage<P>() : nullptr;
+            return storage<P>() ? &**storage<P>() : nullptr; // const valuet_type*
         } else {
             if constexpr (ViewField<P>::by_ref) {
                 return storage<P>().get(); // const value_type&
@@ -344,6 +369,13 @@ public:
                 return (storage<P>()); // const value_type&
             }
         }
+    }
+
+    template <auto Key>
+        requires(detail::UniqueKeyInModel<Key, Ps...>)
+    decltype(auto) get() const {
+        using P = detail::param_by_key_t<Key, Ps...>;
+        return this->template get<P>();
     }
 
     // Convert a view into an owning model (copies out).
@@ -542,6 +574,20 @@ template <ParameterSpec... Ps> struct Model : private Field<Ps>... {
         requires((std::is_same_v<P, Ps>) || ...)
     const typename P::stored_type& get() const {
         return Field<P>::value;
+    }
+
+    template <auto Key>
+        requires(detail::UniqueKeyInModel<Key, Ps...>)
+    decltype(auto) get() {
+        using P = detail::param_by_key_t<Key, Ps...>;
+        return this->template get<P>();
+    }
+
+    template <auto Key>
+        requires(detail::UniqueKeyInModel<Key, Ps...>)
+    decltype(auto) get() const {
+        using P = detail::param_by_key_t<Key, Ps...>;
+        return this->template get<P>();
     }
 
     [[nodiscard]]

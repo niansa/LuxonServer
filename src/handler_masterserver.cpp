@@ -34,9 +34,8 @@ std::string generate_game_id(std::string prefix) {
 namespace models {
 using namespace DictKeyCodes;
 
-using LobbyIdName = Parameter<std::string, AuthAndLobby::Enum, AuthAndLobby::LobbyName, false, DefaultString<"">>;
-using LobbyIdType = Parameter<LobbyType::Enum, AuthAndLobby::Enum, AuthAndLobby::LobbyType, false, DefaultConst<LobbyType::Default>>;
-using LobbyId = Model<LobbyIdName, LobbyIdType>;
+using LobbyId = Model<Parameter<std::string, AuthAndLobby::Enum, AuthAndLobby::LobbyName, false, DefaultString<"">>,
+                      Parameter<LobbyType::Enum, AuthAndLobby::Enum, AuthAndLobby::LobbyType, false, DefaultConst<LobbyType::Default>>>;
 } // namespace models
 
 void MasterServerHandler::HandleSlowUpdate() {
@@ -414,12 +413,12 @@ std::expected<std::shared_ptr<Lobby>, ser::OperationResponseMessage> MasterServe
     const auto lobby_id = models::LobbyId::decode(req);
     if (!lobby_id)
         return std::unexpected(lobby_id.error());
-    const std::string& lobby_name = lobby_id->get<models::LobbyIdName>();
+    const std::string& lobby_name = lobby_id->get<DictKeyCodes::AuthAndLobby::LobbyName>();
 
     if (lobby_name.empty() && joined_lobby_)
         return joined_lobby_->lobby;
 
-    return peer_->persistent->app->get_lobby({lobby_id->get<models::LobbyIdName>(), lobby_id->get<models::LobbyIdType>()});
+    return peer_->persistent->app->get_lobby({lobby_id->get<DictKeyCodes::AuthAndLobby::LobbyName>(), lobby_id->get<DictKeyCodes::AuthAndLobby::LobbyType>()});
 }
 
 void MasterServerHandler::join_lobby(std::shared_ptr<Lobby> lobby) {
