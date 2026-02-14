@@ -26,7 +26,7 @@ using RaiseEvent = Model<Parameter<std::vector<int32_t>, GameAndActor::ActorList
                          Parameter<uint8_t, RoutingAndEvents::Code, false, DefaultConst<200>>>;
 
 using JoinOrCreateGame = Model<Parameter<std::string, GameAndActor::GameId, false>, Parameter<bool, RoutingAndEvents::Broadcast, false, DefaultConst<true>>,
-                               Parameter<bool, AuthAndLobby::CreateIfNotExists, false, DefaultConst<false>>,
+                               Parameter<uint8_t, AuthAndLobby::CreateIfNotExists, false, DefaultConst<false>>,
                                Parameter<std::vector<std::string>, RpcAndPlugins::Plugins, false, DefaultInit>,
                                Parameter<ser::HashtablePtr, Properties::GameProperties, false, DefaultInit>,
                                Parameter<ser::HashtablePtr, Properties::ActorProperties, false, DefaultInit>, Parameter<int32_t, GameSettings::PlayerTTL, true>,
