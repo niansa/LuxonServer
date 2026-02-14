@@ -100,7 +100,7 @@ template <class ValueT, class U> constexpr ValueT to_value(U&& u) {
     if constexpr (std::is_enum_v<ValueT>) {
         return static_cast<ValueT>(u);
     } else {
-        return ValueT{std::forward<U>(u)};
+        return ValueT(std::forward<U>(u));
     }
 }
 
@@ -195,7 +195,7 @@ inline ser::OperationResponseMessage make_decode_error(std::uint8_t op_code, std
 
 // Static storage for defaults used by ModelView (references must outlive the view)
 template <class P> inline const typename P::value_type& view_default_object() {
-    static const typename P::value_type v = to_value<typename P::value_type>(P::default_provider::template get<typename P::value_type>());
+    static const typename P::value_type v = to_value<typename P::value_type>(P::default_provider::template get<typename P::wire_type>());
     return v;
 }
 template <class P> inline const typename P::value_type& view_empty_object() {
@@ -240,8 +240,8 @@ template <class P> inline ser::OperationResponseMessage make_invalid_enum_value_
 // Parameter specification
 
 template <class ValueT, auto Key, bool Optional = false, class DefaultProvider = NoDefault>
-    requires std::is_enum_v<decltype(Key)> && IsVariantMember<detail::wire_type_t<ValueT>, ser::Value::VariantType> &&
-             detail::DefaultCompatible<ValueT, DefaultProvider>
+    requires std::is_enum_v<decltype(Key)> && std::same_as<ValueT, std::remove_cvref_t<ValueT>> &&
+             IsVariantMember<detail::wire_type_t<ValueT>, ser::Value::VariantType> && detail::DefaultCompatible<ValueT, DefaultProvider>
 struct Parameter {
     using value_type = ValueT;
     using wire_type = detail::wire_type_t<ValueT>;
@@ -314,7 +314,7 @@ template <ParameterSpec P> struct ViewField {
                 if constexpr (by_ref)
                     return std::cref(detail::view_default_object<P>());
                 else
-                    return detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
+                    return detail::to_value<value_type>(P::default_provider::template get<typename P::wire_type>());
             } else {
                 return std::nullopt;
             }
@@ -323,7 +323,7 @@ template <ParameterSpec P> struct ViewField {
                 if constexpr (by_ref)
                     return std::cref(detail::view_default_object<P>());
                 else
-                    return detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
+                    return detail::to_value<value_type>(P::default_provider::template get<typename P::wire_type>());
             } else {
                 if constexpr (by_ref)
                     return std::cref(detail::view_empty_object<P>());
@@ -472,7 +472,7 @@ private:
         return h;
     }
 
-    static constexpr std::array<Handler, 256> handlers_ = make_handlers();
+    static inline constexpr std::array<Handler, 256> handlers_ = make_handlers();
 
 public:
     [[nodiscard]]
@@ -524,8 +524,6 @@ public:
     }
 };
 
-template <ParameterSpec... Ps> constexpr std::array<typename ModelView<Ps...>::Handler, 256> ModelView<Ps...>::handlers_;
-
 // Model (owning)
 template <ParameterSpec P> struct Field {
     using value_type = typename P::value_type;
@@ -538,13 +536,13 @@ template <ParameterSpec P> struct Field {
     void reset_to_default() {
         if constexpr (P::optional) {
             if constexpr (P::has_default) {
-                value = detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
+                value = detail::to_value<value_type>(P::default_provider::template get<typename P::wire_type>());
             } else {
                 value = std::nullopt;
             }
         } else {
             if constexpr (P::has_default) {
-                value = detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
+                value = detail::to_value<value_type>(P::default_provider::template get<typename P::wire_type>());
             } else {
                 value = value_type{};
             }
