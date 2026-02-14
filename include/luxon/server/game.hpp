@@ -191,8 +191,8 @@ struct Game : std::enable_shared_from_this<Game> {
 
 #ifdef LUXON_SERVER_ENABLE_PLUGINS
     template <typename InfoStruct>
-    game_plugins::Result execute_plugin_chain(game_plugins::Result (game_plugins::PluginBase::*method)(luxon::ser::OperationRequestMessage&, InfoStruct&),
-                                              luxon::ser::OperationRequestMessage& req, InfoStruct& info) {
+    game_plugins::Result execute_plugin_chain(game_plugins::Result (game_plugins::PluginBase::*method)(const luxon::ser::OperationRequestMessage&, InfoStruct&),
+                                              const luxon::ser::OperationRequestMessage& req, InfoStruct& info) {
         for (const auto& plugin : plugins) {
             game_plugins::Result result = ((*plugin).*method)(req, info);
             if (result != game_plugins::Result::Continue)

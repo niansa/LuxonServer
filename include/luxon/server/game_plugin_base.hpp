@@ -75,13 +75,13 @@ public:
     virtual ~PluginBase() {}
 
     virtual void OnAttach() {}
-    virtual Result OnCreateGame(luxon::ser::OperationRequestMessage& req, OnCreateGameCallInfo&) { return Result::Continue; }
-    virtual Result BeforeJoin(luxon::ser::OperationRequestMessage& req, BeforeJoinGameCallInfo&) { return Result::Continue; }
-    virtual Result OnJoinGame(luxon::ser::OperationRequestMessage& req, OnJoinGameCallInfo&) { return Result::Continue; }
-    virtual Result OnLeave(luxon::ser::OperationRequestMessage& req, OnLeaveGameCallInfo&) { return Result::Continue; }
-    virtual Result OnRaiseEvent(luxon::ser::OperationRequestMessage& req, OnRaiseEventCallInfo&) { return Result::Continue; }
-    virtual Result BeforeSetProperties(luxon::ser::OperationRequestMessage& req, BeforeSetPropertiesCallInfo&) { return Result::Continue; }
-    virtual Result OnSetProperties(luxon::ser::OperationRequestMessage& req, OnSetPropertiesCallInfo&) { return Result::Continue; }
+    virtual Result OnCreateGame(const luxon::ser::OperationRequestMessage& req, OnCreateGameCallInfo&) { return Result::Continue; }
+    virtual Result BeforeJoin(const luxon::ser::OperationRequestMessage& req, BeforeJoinGameCallInfo&) { return Result::Continue; }
+    virtual Result OnJoinGame(const luxon::ser::OperationRequestMessage& req, OnJoinGameCallInfo&) { return Result::Continue; }
+    virtual Result OnLeave(const luxon::ser::OperationRequestMessage& req, OnLeaveGameCallInfo&) { return Result::Continue; }
+    virtual Result OnRaiseEvent(const luxon::ser::OperationRequestMessage& req, OnRaiseEventCallInfo&) { return Result::Continue; }
+    virtual Result BeforeSetProperties(const luxon::ser::OperationRequestMessage& req, BeforeSetPropertiesCallInfo&) { return Result::Continue; }
+    virtual Result OnSetProperties(const luxon::ser::OperationRequestMessage& req, OnSetPropertiesCallInfo&) { return Result::Continue; }
     virtual Result BeforeCloseGame(BeforeCloseGameCallInfo&) { return Result::Continue; }
     virtual Result OnCloseGame(OnCloseGameCallInfo&) { return Result::Continue; }
 

@@ -8,6 +8,7 @@
 #include "game_plugin_base.hpp"
 #endif
 #include "global.hpp"
+#include "data_model.hpp"
 #include "authentication.hpp"
 
 #include <ranges>
@@ -15,6 +16,32 @@
 #include <luxon/common_codes.hpp>
 
 namespace server {
+namespace models {
+using namespace DictKeyCodes;
+
+using RaiseEvent = Model<Parameter<std::vector<int32_t>, GameAndActor::ActorList, true>,
+                         Parameter<ReceiverGroup::Enum, RoutingAndEvents::ReceiverGroup, false, DefaultConst<ReceiverGroup::Others>>,
+                         Parameter<uint8_t, RoutingAndEvents::InterestGroup, false, DefaultConst<0>>,
+                         Parameter<CacheOperation::Enum, RoutingAndEvents::Cache, false, DefaultConst<CacheOperation::DoNotCache>>,
+                         Parameter<uint8_t, RoutingAndEvents::Code, false, DefaultConst<200>>>;
+
+using JoinOrCreateGame = Model<Parameter<std::string, GameAndActor::GameId, false>, Parameter<bool, RoutingAndEvents::Broadcast, false, DefaultConst<true>>,
+                               Parameter<bool, AuthAndLobby::CreateIfNotExists, false, DefaultConst<false>>,
+                               Parameter<std::vector<std::string>, RpcAndPlugins::Plugins, false, DefaultInit>,
+                               Parameter<ser::HashtablePtr, Properties::GameProperties, false, DefaultInit>,
+                               Parameter<ser::HashtablePtr, Properties::ActorProperties, false, DefaultInit>, Parameter<int32_t, GameSettings::PlayerTTL, true>,
+                               Parameter<int32_t, GameSettings::EmptyRoomTTL, true>, Parameter<int32_t, GameSettings::GameFlags, true>,
+                               Parameter<bool, GameSettings::CheckUserOnJoin, true>, Parameter<bool, RoutingAndEvents::SuppressRoomEvents, true>,
+                               Parameter<bool, RoutingAndEvents::PublishUserId, true>>;
+
+using SetProperties =
+    Model<Parameter<ser::HashtablePtr, Properties::Properties, false, DefaultInit>,
+          Parameter<ser::HashtablePtr, Properties::ExpectedValues, false, DefaultInit>, Parameter<bool, RoutingAndEvents::Broadcast, false, DefaultConst<true>>,
+          Parameter<int32_t, GameAndActor::ActorNo, false, DefaultConst<0>>>;
+
+using ChangeInterestGroups = Model<Parameter<ser::ByteArray, RoutingAndEvents::Add>, Parameter<ser::ByteArray, RoutingAndEvents::Remove>>;
+} // namespace models
+
 void GameServerHandler::HandleDisconnect() {
     if (auto& game = get_game()) {
         // Cleanup cache if enabled
@@ -101,27 +128,32 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
     } else if (auto game = get_game()) {
 
         if (req.operation_code == OpCodes::Lite::RaiseEvent) {
+            using namespace DictKeyCodes::RoutingAndEvents;
+            using DictKeyCodes::GameAndActor::ActorList;
+
             if (!ensure_joined_state())
                 return;
 
-            const auto& actors_param = req.parameters[DictKeyCodes::GameAndActor::ActorList];
-            const auto receiver_group = req.parameters[DictKeyCodes::RoutingAndEvents::ReceiverGroup].get_or<uint8_t>(0);
-            const auto interest_group = req.parameters[DictKeyCodes::RoutingAndEvents::InterestGroup].get_or<uint8_t>(0);
-            const auto cache_op = req.parameters[DictKeyCodes::RoutingAndEvents::Cache].get_or<uint8_t>(CacheOperation::DoNotCache);
-            auto data_param = req.parameters[DictKeyCodes::RoutingAndEvents::Data];
-            const auto code = req.parameters[DictKeyCodes::RoutingAndEvents::Code].get_or<uint8_t>(200);
+            const auto params = models::RaiseEvent::decode(req);
+            if (!params) {
+                send(proto_->Serialize(params.error()));
+                return;
+            }
+
+            auto data_param = req.parameters[Data];
+            const auto cache_op = params->get<Cache>();
 
             // Build event
             Event event;
             event.sender_actor_id = game_peer_->actor_id;
-            event.code = code;
+            event.code = params->get<Code>();
             event.delivery_mode = enet::FlagsToEnetDeliveryMode(cmd_header.flags);
-            event.interest_group = interest_group;
+            event.interest_group = params->get<InterestGroup>();
             event.channel = cmd_header.channel_id;
-            if (auto *actors = actors_param.get_ptr<std::vector<int32_t>>())
+            if (const auto& actors = params->get<ActorList>())
                 event.receivers = *actors | std::ranges::to<std::unordered_set>();
             else
-                event.receivers = receiver_group;
+                event.receivers = params->get<DictKeyCodes::RoutingAndEvents::ReceiverGroup>();
             event.data = std::move(data_param);
 
             // Call into plugins
@@ -152,7 +184,7 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
             if (cache_op == CacheOperation::RemoveFromRoomCache) {
                 std::vector<int32_t> filter_senders;
                 // Use target actors option to specify the sender number
-                if (auto *actors = actors_param.get_ptr<std::vector<int32_t>>())
+                if (const auto& actors = params->get<ActorList>())
                     filter_senders = *actors;
 
                 ser::Hashtable filter_data;
@@ -161,11 +193,11 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
                         filter_data = *ptr;
 
                 // Event code 0 is wildcard
-                const bool wildcard_code = code == 0;
+                const bool wildcard_code = event.code == 0;
 
                 game->event_cache.remove_if([&](const Event& cached_event) {
                     // Code Filter
-                    if (!wildcard_code && cached_event.code != code)
+                    if (!wildcard_code && cached_event.code != event.code)
                         return false;
 
                     // Sender Filter
@@ -201,7 +233,9 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
 
             // Add To Cache
             bool can_cache = (cache_op == CacheOperation::AddToRoomCache || cache_op == CacheOperation::AddToRoomCacheGlobal);
-            if (can_cache && actors_param.get_ptr<std::vector<int32_t>>() == nullptr && receiver_group != ReceiverGroup::MasterClient && interest_group == 0) {
+            if (can_cache && params->get<ActorList>() == nullptr &&
+                params->get<DictKeyCodes::RoutingAndEvents::ReceiverGroup>() != ReceiverGroup::MasterClient &&
+                params->get<DictKeyCodes::RoutingAndEvents::ReceiverGroup>() == 0) {
                 Event cached_copy = event; // Making copy to allow change below to happen non-destructively
                 if (cache_op == CacheOperation::AddToRoomCacheGlobal)
                     cached_copy.sender_actor_id = 0; // Can not be traced back
@@ -225,12 +259,16 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
             if (!ensure_joined_state(false))
                 return;
 
+            const auto params = models::JoinOrCreateGame::decode(req);
+            if (!params) {
+                send(proto_->Serialize(params.error()));
+                return;
+            }
+
             const bool is_master = game->peers.empty();
-            const auto broadcast = req.parameters[DictKeyCodes::RoutingAndEvents::Broadcast].get_or<bool>(true);
-            const std::string& game_id = req.parameters[DictKeyCodes::GameAndActor::GameId].get_or<std::string>(game->id);
 
             // Validate game ID
-            if (game_id != game->id) {
+            if (params->get<DictKeyCodes::GameAndActor::GameId>() != game->id) {
                 const ser::OperationResponseMessage resp{.operation_code = req.operation_code,
                                                          .return_code = ErrorCodes::Matchmaking::GameIdNotExists,
                                                          .debug_message = "Token not valid for this Game ID"};
@@ -240,8 +278,7 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
 
             if (is_master) {
                 // Load given plugins if creating room
-                const auto& plugins = req.parameters[DictKeyCodes::RpcAndPlugins::Plugins].get_or<std::vector<std::string>>();
-                for (const std::string& plugin_name : plugins) {
+                for (const std::string& plugin_name : params->get<DictKeyCodes::RpcAndPlugins::Plugins>()) {
 #ifdef LUXON_SERVER_ENABLE_PLUGINS
                     auto plugin = game_plugins::registry::instantiate(get_game().get(), plugin_name);
                     if (!plugin) {
@@ -273,7 +310,7 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
                 if (game->peers.empty()) {
                     OnCreateGameCallInfo info{.creator = peer_,
                                               .is_join = req.operation_code == OpCodes::Matchmaking::JoinGame,
-                                              .create_if_not_exist = req.parameters[DictKeyCodes::AuthAndLobby::CreateIfNotExists].get_or<bool>(false)};
+                                              .create_if_not_exist = params->get<DictKeyCodes::AuthAndLobby::CreateIfNotExists>()};
                     res = game->execute_plugin_chain(&PluginBase::OnCreateGame, req, info);
                 } else {
                     BeforeJoinGameCallInfo info{.joiner = peer_};
@@ -289,13 +326,15 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
 
             // Apply game settings
             if (is_master) { // TODO: Make sure only master can set these options in reference impl!
-                req.parameters[DictKeyCodes::GameSettings::PlayerTTL].store_if<int32_t>(game->player_ttl);
-                req.parameters[DictKeyCodes::GameSettings::EmptyRoomTTL].store_if<int32_t>(game->empty_game_ttl);
+                if (auto player_ttl = params->get<DictKeyCodes::GameSettings::PlayerTTL>())
+                    game->player_ttl = *player_ttl;
+                if (auto empty_room_ttl = params->get<DictKeyCodes::GameSettings::EmptyRoomTTL>())
+                    game->empty_game_ttl = *empty_room_ttl;
 
-                if (auto *flags = req.parameters[DictKeyCodes::GameSettings::GameFlags].get_ptr<int32_t>())
+                if (auto flags = params->get<DictKeyCodes::GameSettings::GameFlags>())
                     game->flags = *flags;
 
-                auto set_flag = [&](int32_t flag, const bool *value) {
+                auto set_flag = [&](int32_t flag, std::optional<bool> value) {
                     if (!value)
                         return;
                     if (*value)
@@ -304,9 +343,9 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
                         game->flags &= ~flag;
                 };
 
-                set_flag(GameFlags::CheckUserOnJoin, req.parameters[DictKeyCodes::GameSettings::CheckUserOnJoin].get_ptr<bool>());
-                set_flag(GameFlags::SuppressRoomEvents, req.parameters[DictKeyCodes::RoutingAndEvents::SuppressRoomEvents].get_ptr<bool>());
-                set_flag(GameFlags::PublishUserId, req.parameters[DictKeyCodes::RoutingAndEvents::PublishUserId].get_ptr<bool>());
+                set_flag(GameFlags::CheckUserOnJoin, params->get<DictKeyCodes::GameSettings::CheckUserOnJoin>());
+                set_flag(GameFlags::SuppressRoomEvents, params->get<DictKeyCodes::RoutingAndEvents::SuppressRoomEvents>());
+                set_flag(GameFlags::PublishUserId, params->get<DictKeyCodes::RoutingAndEvents::PublishUserId>());
             }
 
             // We capture props here so the response only contains the list of OTHER players if joining
@@ -351,13 +390,11 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
             peer_->log->info("Successfully joined game: {}", game->id);
 
             // Update properties
-            const auto& game_props = req.parameters[DictKeyCodes::Properties::GameProperties].get_or<ser::HashtablePtr>(nullptr);
-            const auto& actor_props = req.parameters[DictKeyCodes::Properties::ActorProperties].get_or<ser::HashtablePtr>(nullptr);
-
-            if (actor_props)
+            if (const auto& actor_props = params->get<DictKeyCodes::Properties::ActorProperties>())
                 game->insert_actor_props(game_peer_->actor_id, *actor_props);
-            if (game_props && is_master)
-                game->insert_game_props(*game_props);
+            if (is_master)
+                if (const auto& game_props = params->get<DictKeyCodes::Properties::GameProperties>())
+                    game->insert_game_props(*game_props);
 
             // Construct response
             ser::OperationResponseMessage resp;
@@ -425,15 +462,21 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
             if (!ensure_joined_state())
                 return;
 
-            auto broadcast = req.parameters[DictKeyCodes::RoutingAndEvents::Broadcast].get_or<bool>(true);
-            auto actor_id = req.parameters[DictKeyCodes::GameAndActor::ActorNo].get_or<int32_t>(0);
+            const auto params = models::SetProperties::decode(req);
+            if (!params) {
+                send(proto_->Serialize(params.error()));
+                return;
+            }
+
+            bool broadcast = params->get<DictKeyCodes::RoutingAndEvents::Broadcast>();
+            auto actor_id = params->get<DictKeyCodes::GameAndActor::ActorNo>();
 
             // Can only set non-self props as master
             if (actor_id != game_peer_->actor_id && !ensure_is_master())
                 return;
 
-            const auto props = req.parameters[DictKeyCodes::Properties::Properties].get_or<ser::HashtablePtr>(nullptr);
-            const auto props_expected = req.parameters[DictKeyCodes::Properties::ExpectedValues].get_or<ser::HashtablePtr>(nullptr);
+            const auto& props = params->get<DictKeyCodes::Properties::Properties>();
+            const auto& props_expected = params->get<DictKeyCodes::Properties::ExpectedValues>();
 
             // Call into plugins
             GAME_PLUGINS_INVOKE({
@@ -497,21 +540,16 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
         }
 
         case OpCodes::Lite::ChangeInterestGroups: {
-            const auto& add_param = req.parameters[DictKeyCodes::RoutingAndEvents::Add];
-            const auto& remove_param = req.parameters[DictKeyCodes::RoutingAndEvents::Remove];
-
-            if (!add_param.is<ser::ByteArray>() || !remove_param.is<ser::ByteArray>()) {
-                const ser::OperationResponseMessage resp{.operation_code = OpCodes::Lite::ChangeInterestGroups,
-                                                         .return_code = ErrorCodes::Data::InvalidRequestParameters,
-                                                         .debug_message = "Bad parameter type, expected byte array"};
-                send(proto_->Serialize(resp));
+            const auto params = models::ChangeInterestGroups::decode(req);
+            if (!params) {
+                send(proto_->Serialize(params.error()));
                 return;
             }
 
             // Remove first, then add (TODO: Verify order)
-            for (const uint8_t group : remove_param.get_or<std::vector<uint8_t>>())
+            for (const uint8_t group : params->get<DictKeyCodes::RoutingAndEvents::Remove>())
                 game_peer_->interest_groups.erase(group);
-            for (const uint8_t group : add_param.get_or<std::vector<uint8_t>>())
+            for (const uint8_t group : params->get<DictKeyCodes::RoutingAndEvents::Add>())
                 game_peer_->interest_groups.insert(group);
 
             return;
