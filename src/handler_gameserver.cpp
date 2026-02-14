@@ -310,7 +310,7 @@ void GameServerHandler::HandleOperationRequest(const ser::OperationRequestMessag
                 if (game->peers.empty()) {
                     OnCreateGameCallInfo info{.creator = peer_,
                                               .is_join = req.operation_code == OpCodes::Matchmaking::JoinGame,
-                                              .create_if_not_exist = params->get<DictKeyCodes::AuthAndLobby::CreateIfNotExists>()};
+                                              .create_if_not_exist = static_cast<bool>(params->get<DictKeyCodes::AuthAndLobby::CreateIfNotExists>())};
                     res = game->execute_plugin_chain(&PluginBase::OnCreateGame, req, info);
                 } else {
                     BeforeJoinGameCallInfo info{.joiner = peer_};
