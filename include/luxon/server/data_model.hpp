@@ -19,7 +19,8 @@
 #include <type_traits>
 #include <utility>
 #include <variant>
-
+#include <vector>
+#include <memory>
 #include <luxon/common_codes.hpp>
 #include <luxon/ser_types.hpp>
 #include <magic_enum/magic_enum.hpp>
@@ -61,14 +62,19 @@ struct NoDefault {
     static constexpr bool provided = false;
 };
 
+struct DefaultInit {
+    static constexpr bool provided = true;
+    template <typename T> static constexpr T get() { return T{}; }
+};
+
 template <auto V> struct DefaultConst {
     static constexpr bool provided = true;
-    static constexpr decltype(auto) get() { return V; }
+    template <typename T> static constexpr T get() { return V; }
 };
 
 template <StringLiteral Lit> struct DefaultString {
     static constexpr bool provided = true;
-    static std::string get() { return std::string(std::string_view(Lit)); }
+    template <typename T> static T get() { return T(std::string_view(Lit)); }
 };
 
 namespace detail {
@@ -103,10 +109,11 @@ template <class ValueT, class U> constexpr ValueT to_value(U&& u) {
 // - Else DefaultProvider::get() must exist and be convertible to ValueT,
 //   or (for enums) convertible to ValueT OR its wire type.
 template <class ValueT, class DefaultProvider>
-concept DefaultCompatible = (!DefaultProvider::provided) || (requires { DefaultProvider::get(); } &&
-                                                             (is_enum_v<ValueT> ? (std::is_convertible_v<decltype(DefaultProvider::get()), ValueT> ||
-                                                                                   std::is_convertible_v<decltype(DefaultProvider::get()), wire_type_t<ValueT>>)
-                                                                                : std::is_convertible_v<decltype(DefaultProvider::get()), ValueT>));
+concept DefaultCompatible = (!DefaultProvider::provided) || (requires {
+                                DefaultProvider::template get<ValueT>();
+                            } && (is_enum_v<ValueT> ? (std::is_convertible_v<decltype(DefaultProvider::template get<ValueT>()), ValueT> ||
+                                                       std::is_convertible_v<decltype(DefaultProvider::template get<ValueT>()), wire_type_t<ValueT>>)
+                                                    : std::is_convertible_v<decltype(DefaultProvider::template get<ValueT>()), ValueT>));
 
 // Heuristic: in views, store references for non-trivially-copyable types
 template <class T> inline constexpr bool view_by_ref_v = (!std::is_trivially_copyable_v<remove_cvref_t<T>>) && (!std::is_enum_v<remove_cvref_t<T>>);
@@ -188,7 +195,7 @@ inline ser::OperationResponseMessage make_decode_error(std::uint8_t op_code, std
 
 // Static storage for defaults used by ModelView (references must outlive the view)
 template <class P> inline const typename P::value_type& view_default_object() {
-    static const typename P::value_type v = to_value<typename P::value_type>(P::default_provider::get());
+    static const typename P::value_type v = to_value<typename P::value_type>(P::default_provider::template get<typename P::value_type>());
     return v;
 }
 template <class P> inline const typename P::value_type& view_empty_object() {
@@ -232,18 +239,16 @@ template <class P> inline ser::OperationResponseMessage make_invalid_enum_value_
 
 // Parameter specification
 
-template <class ValueT, ByteKeyEnum KeyEnumT, KeyEnumT Key, bool Optional = false, class DefaultProvider = NoDefault>
-    requires ValidByteKeyEnumerator<KeyEnumT, Key> && IsVariantMember<detail::wire_type_t<ValueT>, ser::Value::VariantType> &&
+template <class ValueT, auto Key, bool Optional = false, class DefaultProvider = NoDefault>
+    requires std::is_enum_v<decltype(Key)> && IsVariantMember<detail::wire_type_t<ValueT>, ser::Value::VariantType> &&
              detail::DefaultCompatible<ValueT, DefaultProvider>
 struct Parameter {
     using value_type = ValueT;
     using wire_type = detail::wire_type_t<ValueT>;
-    using key_enum = KeyEnumT;
+    using key_enum = decltype(Key);
 
     static constexpr key_enum key = Key;
     static constexpr std::uint8_t wire_key = static_cast<std::uint8_t>(Key);
-
-    static_assert(static_cast<std::uint64_t>(wire_key) <= 255);
 
     static constexpr bool optional = Optional;
 
@@ -254,7 +259,7 @@ struct Parameter {
 };
 
 template <typename T> struct IsParameterSpecImpl : std::false_type {};
-template <class V, ByteKeyEnum E, E K, bool Opt, class Def> struct IsParameterSpecImpl<Parameter<V, E, K, Opt, Def>> : std::true_type {};
+template <class V, auto K, bool Opt, class Def> struct IsParameterSpecImpl<Parameter<V, K, Opt, Def>> : std::true_type {};
 
 template <typename T>
 concept ParameterSpec = IsParameterSpecImpl<std::remove_cvref_t<T>>::value;
@@ -309,7 +314,7 @@ template <ParameterSpec P> struct ViewField {
                 if constexpr (by_ref)
                     return std::cref(detail::view_default_object<P>());
                 else
-                    return detail::to_value<value_type>(P::default_provider::get());
+                    return detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
             } else {
                 return std::nullopt;
             }
@@ -318,7 +323,7 @@ template <ParameterSpec P> struct ViewField {
                 if constexpr (by_ref)
                     return std::cref(detail::view_default_object<P>());
                 else
-                    return detail::to_value<value_type>(P::default_provider::get());
+                    return detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
             } else {
                 if constexpr (by_ref)
                     return std::cref(detail::view_empty_object<P>());
@@ -357,17 +362,18 @@ public:
     // - required: const value_type&
     // - optional by-value: const std::optional<value_type>&
     // - optional by-ref: const value_type*
-    template <ParameterSpec P>
-        requires((std::is_same_v<P, Ps>) || ...)
-    decltype(auto) get() const {
+    template <ParameterSpec P> decltype(auto) get() const {
         if constexpr (P::optional) {
-            return storage<P>() ? &**storage<P>() : nullptr; // const valuet_type*
-        } else {
             if constexpr (ViewField<P>::by_ref) {
-                return storage<P>().get(); // const value_type&
+                return storage<P>() ? std::addressof(storage<P>()->get()) : nullptr;
             } else {
-                return (storage<P>()); // const value_type&
+                return storage<P>();
             }
+        } else {
+            if constexpr (ViewField<P>::by_ref)
+                return storage<P>().get();
+            else
+                return storage<P>();
         }
     }
 
@@ -389,7 +395,7 @@ public:
                 if constexpr (ViewField<P>::by_ref) {
                     const auto& opt_ref = get<P>();
                     if (opt_ref)
-                        dst = opt_ref->get();
+                        dst = *opt_ref;
                     else
                         dst = std::nullopt;
                 } else {
@@ -416,11 +422,10 @@ private:
 
         // Null handling
         if (src.is_null()) {
-            if constexpr (P::optional) {
+            if constexpr (P::optional)
                 storage<P>().reset();
-            } else {
+            else if constexpr (!P::has_default)
                 errs[I] = detail::make_required_null_error<P>(op_code);
-            }
             return;
         }
 
@@ -439,25 +444,15 @@ private:
                 return;
             }
 
-            if constexpr (P::optional)
-                storage<P>() = enum_val;
-            else
-                storage<P>() = enum_val;
+            storage<P>() = enum_val;
 
             return;
         } else {
             // Non-enum: by-ref or by-value
-            if constexpr (ViewField<P>::by_ref) {
-                if constexpr (P::optional)
-                    storage<P>() = std::cref(*p);
-                else
-                    storage<P>() = std::cref(*p);
-            } else {
-                if constexpr (P::optional)
-                    storage<P>() = *p;
-                else
-                    storage<P>() = *p;
-            }
+            if constexpr (ViewField<P>::by_ref)
+                storage<P>() = std::cref(*p);
+            else
+                storage<P>() = *p;
         }
     }
 
@@ -543,13 +538,13 @@ template <ParameterSpec P> struct Field {
     void reset_to_default() {
         if constexpr (P::optional) {
             if constexpr (P::has_default) {
-                value = detail::to_value<value_type>(P::default_provider::get());
+                value = detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
             } else {
                 value = std::nullopt;
             }
         } else {
             if constexpr (P::has_default) {
-                value = detail::to_value<value_type>(P::default_provider::get());
+                value = detail::to_value<value_type>(P::default_provider::template get<typename P::value_type>());
             } else {
                 value = value_type{};
             }
