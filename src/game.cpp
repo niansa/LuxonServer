@@ -376,9 +376,16 @@ bool Game::expect_game_props(ser::Hashtable expected) {
     if (!ok)
         return false;
 
-    for (const auto& [key, value] : expected)
+    for (const auto& [key, value] : expected) {
+#define PROP_MAP_ENTRY(game_param, type, var, updates_lobby)                                                                                                   \
+    if (key == GameProps::game_param)                                                                                                                          \
+        continue;
+        PROP_MAP
+#undef PROP_MAP_ENTRY
+
         if ((!custom_props.contains(key) && (!value.is_null() || !(flags & GameFlags::DeleteNullProps))) || custom_props.at(key) != value)
             return false;
+    }
 
     return true;
 }
