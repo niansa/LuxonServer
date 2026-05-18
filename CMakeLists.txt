@@ -29,7 +29,6 @@ include(CMakeDependentOption)
 
 # Base Options
 option(LUXON_SERVER_BUILD_FFI "Build the FFI" OFF)
-option(LUXON_SERVER_ENABLE_PLUGINS "Enable plugins" OFF)
 
 # Dependent Options
 cmake_dependent_option(LUXON_SERVER_EXPOSE_FULL_FFI
@@ -44,6 +43,12 @@ cmake_dependent_option(LUXON_SERVER_ENABLE_COROUTINES
 option(LUXON_SERVER_HOOKPOINTS "Allows library user or plugins to hook into specific parts of Luxon Server" OFF)
 if (LUXON_SERVER_EXPOSE_FULL_FFI)
     set(LUXON_SERVER_HOOKPOINTS ON CACHE BOOL "Allows library user or plugins to hook into specific parts of Luxon Server" FORCE)
+endif()
+
+# Plugin Logic
+option(LUXON_SERVER_ENABLE_PLUGINS "Enable plugins" OFF)
+if (LUXON_SERVER_EXPOSE_FULL_FFI)
+    set(LUXON_SERVER_ENABLE_PLUGINS ON CACHE BOOL "Enable plugins" FORCE)
 endif()
 
 # Standard Options
