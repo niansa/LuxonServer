@@ -89,7 +89,7 @@ Possible compile time options:
  - **`LUXON_PLUGINS`** (default: empty): Semicolon separated list of CMake projects to configure containing `luxon_register_plugin()` CMake calls for statically linking a plugin into Luxon Server
  - **`LUXON_SERVER_ENABLE_COROUTINES`** (default: `OFF`): Enables coroutines, potentially required for some plugins, makes plugin development easier. *Only available if `LUXON_SERVER_ENABLE_PLUGINS` is `ON`. Strictly disabled if `LUXON_SERVER_BUILD_FFI` is `ON`*
  - **`LUXON_SERVER_BUILD_FFI`** (default: `OFF`): Builds the FFI library
- - **`LUXON_SERVER_EXPOSE_FULL_FFI`** (default: `OFF`): Enables all features required to expose the *full* FFI. *Only available if `LUXON_SERVER_BUILD_FFI` is `ON`. Forces `LUXON_SERVER_HOOKPOINTS` to be `ON`*
+ - **`LUXON_SERVER_EXPOSE_FULL_FFI`** (default: `OFF`): Enables all features required to expose the *full* FFI. *Only available if `LUXON_SERVER_BUILD_FFI` is `ON`. Forces `LUXON_SERVER_ENABLE_PLUGINS` and `LUXON_SERVER_HOOKPOINTS` to be `ON`*
  - **`LUXON_SERVER_POLL`** (default: `OFF`): Polls sockets blindly and rapidly, less efficient and slower
  - **`LUXON_SERVER_HOOKPOINTS`** (default: `OFF`, forced `ON` if full FFI is exposed): Useful when linking LuxonServer as a library, allows hooking into some parts of the server via `ServerManager::hookpoints` (see [hookpoints.hpp](https://github.com/niansa/LuxonServer/blob/master/include/luxon/server/hookpoints.hpp))
  - **`LUXON_USE_EMBED_RESOURCE`** (default: `OFF` except on Windows and WebAssembly): Uses the [embedresource](https://github.com/ankurvdev/embedresource) library for binary embedding instead of inline assembly
