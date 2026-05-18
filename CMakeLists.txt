@@ -22,42 +22,39 @@ endif()
 
 include(cmake/CPM.cmake)
 
-option(LUXON_SERVER_BUILD_FFI "Builds shared library with C FFI" OFF)
-option(LUXON_SERVER_ENABLE_PLUGINS "Enable use of plugins" ${LUXON_SERVER_EXPOSE_FULL_FFI})
-
 include(CMakeDependentOption)
 
-# Base Options
-option(LUXON_SERVER_BUILD_FFI "Build the FFI" OFF)
+# Core server options
+option(LUXON_SERVER_ENABLE_WEBSERVER "Enable the built-in webserver" ON)
+option(LUXON_SERVER_POLL "Poll blindly instead of select with timeout, less efficient" OFF)
+option(LUXON_USE_EMBED_RESOURCE "Use EmbedResource instead of incbin.h" OFF)
 
-# Dependent Options
+# Profiling options
+option(LUXON_SERVER_TRACY "Build Luxon Server with tracy enabled" OFF)
+cmake_dependent_option(LUXON_SERVER_TRACY_ON_DEMAND
+    "Only collect tracy data with profiler server connected" ON
+    "LUXON_SERVER_TRACY" OFF)
+
+# FFI & Plugin options
+option(LUXON_SERVER_BUILD_FFI "Builds shared library with C FFI" OFF)
+
 cmake_dependent_option(LUXON_SERVER_EXPOSE_FULL_FFI
     "Build with full FFI interface exposed" OFF
     "LUXON_SERVER_BUILD_FFI" OFF)
 
-cmake_dependent_option(LUXON_SERVER_ENABLE_COROUTINES
-    "Enable execution of handler code in coroutines" OFF
-    "LUXON_SERVER_ENABLE_PLUGINS;NOT LUXON_SERVER_BUILD_FFI" OFF)
-
-# Hookpoints Logic
 option(LUXON_SERVER_HOOKPOINTS "Allows library user or plugins to hook into specific parts of Luxon Server" OFF)
+option(LUXON_SERVER_ENABLE_PLUGINS "Enable use of plugins" OFF)
+
 if (LUXON_SERVER_EXPOSE_FULL_FFI)
     set(LUXON_SERVER_HOOKPOINTS ON CACHE BOOL "Allows library user or plugins to hook into specific parts of Luxon Server" FORCE)
+    set(LUXON_SERVER_ENABLE_PLUGINS ON CACHE BOOL "Enable use of plugins" FORCE)
 endif()
 
-# Plugin Logic
-option(LUXON_SERVER_ENABLE_PLUGINS "Enable plugins" OFF)
-if (LUXON_SERVER_EXPOSE_FULL_FFI)
-    set(LUXON_SERVER_ENABLE_PLUGINS ON CACHE BOOL "Enable plugins" FORCE)
-endif()
+cmake_dependent_option(LUXON_SERVER_ENABLE_COROUTINES
+    "Enable execution of handler code in coroutines" OFF
+    "LUXON_SERVER_ENABLE_PLUGINS;NOT LUXON_SERVER_BUILD_FFI;NOT WASI" OFF)
 
-# Standard Options
-option(LUXON_SERVER_ENABLE_WEBSERVER "Enable the built-in webserver" ON)
-option(LUXON_SERVER_POLL "Poll blindly instead of select with timeout, less efficient" OFF)
-option(LUXON_USE_EMBED_RESOURCE "Use EmbedResource instead of incbin.h" OFF)
-option(LUXON_SERVER_TRACY "Build Luxon Server with tracy enabled" OFF)
-option(LUXON_SERVER_TRACY_ON_DEMAND "Only collect tracy data with profiler server connected" ON)
-
+# Basic defines
 set(WEB_ROOT_PATH "${CMAKE_CURRENT_SOURCE_DIR}/web")
 
 # Apply single-threaded optimizations if strictly single-threaded
