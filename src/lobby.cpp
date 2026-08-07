@@ -65,10 +65,10 @@ Lobby::Lobby(std::shared_ptr<App> app, std::string name, uint8_t type) : app(std
             sql,
             [](void *, int action, const char *arg1, const char *arg2, const char *, const char *) -> int {
                 // Only allow certain functions
-                if (action == SQLITE_FUNCTION && arg1 != nullptr) {
-                    std::string_view func(arg1);
+                if (action == SQLITE_FUNCTION && arg2 != nullptr) {
+                    std::string_view func(arg2);
 
-                    if (func != "LIKE" && func != "GLOB" && func != "lower" && func != "upper" && func != "ifnull" && func != "coalesce" && func != "abs" &&
+                    if (func != "like" && func != "glob" && func != "lower" && func != "upper" && func != "ifnull" && func != "coalesce" && func != "abs" &&
                         func != "length" && func != "count" && func != "min" && func != "max")
                         return SQLITE_DENY;
                     return SQLITE_OK;
@@ -212,7 +212,7 @@ std::vector<std::string> Lobby::query_lobbies(const std::string& sql_queries) {
 
         int status = sqlite3_prepare_v2(sql, full_query.c_str(), -1, &stmt, nullptr);
         if (status != SQLITE_OK)
-            throw std::runtime_error(std::format("SQL preparation failed: {}", sqlite3_errstr(status)));
+            throw std::runtime_error(std::format("SQL preparation failed: {}", sqlite3_errmsg(sql)));
 
         // Fetch matching room IDs
         while ((status = sqlite3_step(stmt)) == SQLITE_ROW) {
