@@ -48,8 +48,13 @@ Awaitable<> NameServerHandler::HandleOperationRequest(ser::OperationRequestMessa
         case OpCodes::RpcAndMisc::GetRegions: {
             ZoneScopedN("HandleOperationRequest_GetRegions");
 
-            // Build dummy response with all regions
+            // Build dummy response with all regions unless overidden by config
             std::vector<std::string> regions = {"asia", "au", "cae", "cn", "eu", "hk", "in", "jp", "za", "sa", "kr", "tr", "uae", "us", "usw", "ussc"};
+            const std::vector<std::string>& regions_from_yml = server_manager_.get_region_list();
+
+            if( regions_from_yml.empty() == false ) {
+                regions = regions_from_yml;
+            }
 
             std::vector<std::string> addresses(regions.size());
             for (size_t i = 0; i < regions.size(); ++i)

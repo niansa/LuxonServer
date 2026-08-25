@@ -382,6 +382,25 @@ ServerManagerConfig ServerManager::parse_config(const std::string& config_conten
 
         if (key == "Servers") {
             ParseServersSection(config, section);
+        } else if (key == "RegionList") {
+            if (section.IsScalar()) {
+                config.region_list.push_back(section.As<std::string>());
+            } else if( section.IsSequence() ) {
+                for (Yaml::Iterator it = section.Begin(); it != section.End(); it.operator++(1)) {
+                    Yaml::Node& region_node = (*it).second;
+                    if (region_node.IsScalar()) {
+                       config.region_list.push_back(region_node.As<std::string>());
+                    } else {        
+                        create_logger("ConfigParser")
+                            ->warn("The 'RegionList' must be a valid scalar or valid sequence in yml. It is not, so the default value will be used.");
+                        config.region_list.clear();
+                        break;
+                    }
+                }
+            } else { 
+                create_logger("ConfigParser")
+                    ->warn("The 'RegionList' must be a valid scalar or valid sequence in yml. It is not, so the default value will be used.");
+            }
         } else if (key == "External") {
             create_logger("ConfigParser")
                 ->warn("The 'External' configuration block is deprecated and will be ignored. Please migrate to using 'proxies' within the 'Servers' block.");
@@ -442,6 +461,9 @@ ServerManager::ServerManager(ServerManagerConfig config
     if (parent_ipc_.is_open())
         config.no_banner = true;
 #endif
+
+    // Fill in the region list for the handler_nameserver
+    region_list_ = (std::move(config.region_list));
 
     if (!config.no_banner) {
         static bool banner_printed = false;
