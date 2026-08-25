@@ -23,8 +23,16 @@ body:
         - label: I understand that posting copyrighted code will result in immediate deletion without review.
           required: true
 
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Which server version are you experiencing this issue with? Type in `master` if your build is the latest build from the CI pipeline, or the output of `git rev-parse HEAD` (the commit hash) if you are building the server yourself.
+    validations:
+      required: true
+
   - type: textarea
-    id: reproduction_steps
+    id: description
     attributes:
       label: Describe the bug
       description: (If applicable:) Describe which game you are experiencing this issue with and what the exact issue is. Also specify the platform that you are running the server on.

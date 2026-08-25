@@ -425,6 +425,12 @@ public:
     std::string_view get_random_server_address(ServerType server_type, ServerProtocol proto = ServerProtocol::UDP);
 
     ///
+    /// \brief Gets server manager logger
+    /// \return reference to logger
+    ///
+    auto& get_logger() { return *log_; }
+
+    ///
     /// \brief Gets a list of active connections to this instance
     /// \return Linked list of handlers representing a connection
     ///

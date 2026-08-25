@@ -75,12 +75,15 @@ Game::~Game() {
         execute_plugin_chain(&PluginBase::OnCloseGame, info);
     });
 
+    auto& server_manager = get_server_manager();
 #ifdef LUXON_SERVER_ENABLE_MULTIPROCESSING
     ser::EventMessage ipc_event;
     ipc_event.event_code = IPCEventCodes::GameDelete;
     add_game_info(ipc_event.parameters);
-    get_server_manager().ipc_broadcast(ipc_event);
+    server_manager.ipc_broadcast(ipc_event);
 #endif
+
+    server_manager.get_logger().info("Game '{}' in app '{}' is being deleted", lobby->app->id, id);
 }
 
 Game::Game(std::shared_ptr<Lobby> lobby, std::string id, std::string_view server_address)

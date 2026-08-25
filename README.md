@@ -72,6 +72,8 @@ If you are unsure whether a contribution touches core compatibility logic, pleas
 Most games using standard matchmaking logic (joining lobbies, creating rooms, random matching) should work immediately without modification to the game client or server configuration.\
 Chat opcodes aren't implemented yet.
 
+**Please AVOID using "Fix Mods" for self hosted Photon with Luxon Server, including `PeakSelfHostedPhoton_Voice_Fix`!!! Luxon Server does NOT need these most of the time, and they have a tendency to break things. Always try connecting without such mod installed first.**
+
 ## Getting Started
 
 There are three ways to get a build of Luxon Server: downloading a stable release, grabbing the latest CI build, or compiling it yourself. 
