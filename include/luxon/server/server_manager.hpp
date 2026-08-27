@@ -86,6 +86,7 @@ struct HttpServerConfig {
 ///
 struct ServerManagerConfig {
     std::vector<ServerConfig> servers;
+    std::vector<std::string> region_list;
     bool enable_ipv6 = true;
     bool no_banner = false;
     unsigned max_connections = 0;
@@ -175,8 +176,14 @@ public:
     Hookpoints hookpoints;
 #endif
 
+    // For use by the handler_nameserver
+    const std::vector<std::string>& get_region_list() const { return region_list_; }
+
 private:
     SockSelector sock_selector_;
+
+    // For use by the handler_nameserver
+    std::vector<std::string> region_list_;
 
     std::shared_ptr<logger> log_;
     std::vector<ServerConfig> configs_;

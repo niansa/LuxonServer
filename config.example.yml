@@ -39,6 +39,11 @@ MaxConnections: 20
 MaxGamePeers: 0
 TickTimeBudget: 2000
 
+#Optional Override for Region List
+#RegionList:
+#    - Asia
+#    - Europe
+
 
 # Settings database
 # Requires LUXON_SERVER_ENABLE_SETTINGS_DATABASE
