@@ -160,7 +160,7 @@ Possible compile time options:
 The server is configured via a `config.yml` file. A `config.example.yml` is provided in the repository.
 The configuration defines the listening ports for the three main server components:
 
-1. **NameServer:** Handles initial region requests (ignored for now) and authentication (stubbed for now).
+1. **NameServer:** Handles initial region requests and authentication.
 2. **MasterServer:** Handles lobbies and matchmaking.
 3. **GameServer:** Hosts the actual room logic and relay.
 
