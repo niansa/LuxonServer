@@ -390,11 +390,11 @@ template <typename T> T *GetRawPointer(const std::unique_ptr<T>& ptr) { return p
 ServerManagerConfig ServerManager::receive_config_from_ipc(IPC& ipc) {
     std::optional<luxon::ser::Message> msg;
 
-    // Poll the non-blocking IPC socket until the parent transmits the configuration
+    // Poll non-blocking IPC socket until parent transmits configuration
     while (!(msg = ipc.receive_message()))
         ;
 
-    // Expect a GenericValueMessage containing the PFR-encoded ServerManagerConfig
+    // Expect a GenericValueMessage containing PFR-encoded ServerManagerConfig
     if (auto *gvm = msg.value().get_if<luxon::ser::GenericValueMessage>()) {
         auto decoded = pfr_codec::from_value<ServerManagerConfig>(gvm->value);
         if (!decoded)
@@ -733,7 +733,7 @@ bool ServerManager::run_once() {
                     log_->warn("Uncaught exception on port {}: {}", port, e.what());
                 }
 
-                // Move to the next server and decrement safety counter
+                // Move to next server and decrement safety counter
                 ++next_server_it_;
                 --servers_to_process;
             }
@@ -1009,7 +1009,7 @@ void ServerManager::setup() {
         if (config.subprocess) {
 #ifdef LUXON_SERVER_ENABLE_MULTIPROCESSING
             setup_subprocess(config);
-            continue; // Skip the native bind routine in the parent for this iteration
+            continue; // Skip native bind routine in parent for this iteration
 #else
             log_->warn("Subprocess enabled in config, but not enabled at compile time");
 #endif
@@ -1207,7 +1207,7 @@ void ServerManager::setup_subprocess(const ServerConfig& config) {
     }
 #endif
 
-    // Encode the configuration object
+    // Encode configuration object
     auto val_res = pfr_codec::to_value(child_config, {.zero_copy = true});
     if (val_res)
         ipc.send_message(luxon::ser::GenericValueMessage{std::move(*val_res)});
