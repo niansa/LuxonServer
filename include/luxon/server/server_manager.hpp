@@ -70,6 +70,8 @@ struct ServerConfig {
 
     std::string external_address;
     std::vector<ProxyConfig> proxies;
+
+    std::vector<std::string> regions;
 };
 
 #ifdef LUXON_SERVER_ENABLE_WEBSERVER
@@ -86,6 +88,7 @@ struct HttpServerConfig {
 ///
 struct ServerManagerConfig {
     std::vector<ServerConfig> servers;
+    std::vector<std::string> regions;
     bool enable_ipv6 = true;
     bool no_banner = false;
     unsigned max_connections = 0;
@@ -180,6 +183,7 @@ private:
 
     std::shared_ptr<logger> log_;
     std::vector<ServerConfig> configs_;
+    std::vector<std::string> regions_;
     std::unordered_map<uint16_t, enet::EnetServer> servers_;
     decltype(servers_)::iterator next_server_it_;
     std::list<HandlerPtr<HandlerBase>> connections_;
@@ -422,6 +426,12 @@ public:
     /// \return reference to logger
     ///
     auto& get_logger() { return *log_; }
+
+    ///
+    /// \brief Gets list of fake regions to expose
+    /// \return list of internal region strings
+    ///
+    const auto& get_regions() const { return regions_; }
 
     ///
     /// \brief Gets a list of active connections to this instance

@@ -332,6 +332,55 @@ void ParseHttpSection(ServerManagerConfig& config, Yaml::Node& section) {
 }
 #endif
 
+std::string TranslateRegion(const std::string& input) {
+    static const std::unordered_map<std::string, std::string> region_map = {
+        // Internal names
+        {"asia", "asia"},
+        {"au", "au"},
+        {"cae", "cae"},
+        {"cn", "cn"},
+        {"eu", "eu"},
+        {"hk", "hk"},
+        {"in", "in"},
+        {"jp", "jp"},
+        {"za", "za"},
+        {"sa", "sa"},
+        {"kr", "kr"},
+        {"tr", "tr"},
+        {"uae", "uae"},
+        {"us", "us"},
+        {"usw", "usw"},
+        {"ussc", "ussc"},
+        // Friendly names
+        {"europe", "eu"},
+        {"australia", "au"},
+        {"canada-east", "cae"},
+        {"china", "cn"},
+        {"hong-kong", "hk"},
+        {"india", "in"},
+        {"japan", "jp"},
+        {"south-africa", "za"},
+        {"south-america", "sa"},
+        {"south-korea", "kr"},
+        {"turkey", "tr"},
+        {"us-west", "usw"},
+        {"us-southcentral", "ussc"},
+    };
+
+    auto it = region_map.find(input);
+    if (it != region_map.end())
+        return it->second;
+
+    std::string valid_names;
+    for (const auto& [key, value] : region_map)
+        if (key != value)
+            valid_names += key + ", ";
+    valid_names.pop_back();
+    valid_names.pop_back();
+
+    throw std::runtime_error(std::format("Unknown region: '{}'. Valid friendly names: {}", input, valid_names));
+}
+
 template <typename T> T *GetRawPointer(T *ptr) { return ptr; }
 template <typename T> T *GetRawPointer(const std::shared_ptr<T>& ptr) { return ptr.get(); }
 template <typename T> T *GetRawPointer(const std::unique_ptr<T>& ptr) { return ptr.get(); }
@@ -395,6 +444,10 @@ ServerManagerConfig ServerManager::parse_config(const std::string& config_conten
             config.max_game_peers = ReadNodeScalar<unsigned>(section, "MaxGamePeers");
         } else if (key == "TickTimeBudget") {
             config.tick_time_budget = ReadNodeScalar<uint32_t>(section, "TickTimeBudget");
+        } else if (key == "Regions") {
+            ExpectSequence(section, "Regions");
+            for (auto itemIt = section.Begin(); itemIt != section.End(); itemIt++)
+                config.regions.push_back((*itemIt).second.As<std::string>());
 #ifdef LUXON_SERVER_ENABLE_SETTINGS_DATABASE
         } else if (key == "SettingsDatabase") {
             config.settings_database_path = ReadNodeScalar<std::string>(section, "SettingsDatabase");
@@ -495,6 +548,19 @@ ServerManager::ServerManager(ServerManagerConfig config
     tick_time_budget_ = config.tick_time_budget;
     if (tick_time_budget_ == 0)
         tick_time_budget_ = ~tick_time_budget_;
+
+    if (config.regions.empty()) {
+        regions_ = {"asia", "au", "cae", "cn", "eu", "hk", "in", "jp", "za", "sa", "kr", "tr", "uae", "us", "usw", "ussc"};
+    } else {
+        for (const auto& r : config.regions) {
+            try {
+                regions_.push_back(TranslateRegion(r));
+            } catch (const std::exception& e) {
+                log_->critical("{}", e.what());
+                throw;
+            }
+        }
+    }
 
 #ifdef LUXON_SERVER_ENABLE_SETTINGS_DATABASE
     if (!config.settings_database_path.empty()) {

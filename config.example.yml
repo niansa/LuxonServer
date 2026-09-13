@@ -39,6 +39,12 @@ MaxConnections: 20
 MaxGamePeers: 0
 TickTimeBudget: 2000
 
+# Fake regions to expose to client
+# Will expose all possible regions by default
+#Regions:
+# - europe
+# - us-west
+
 
 # Settings database
 # Requires LUXON_SERVER_ENABLE_SETTINGS_DATABASE
