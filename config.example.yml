@@ -41,9 +41,11 @@ TickTimeBudget: 2000
 
 # Fake regions to expose to client
 # Will expose all possible regions by default
+# Possible values: us-west, turkey, south-africa, south-korea, india, china, canada-east, australia, us-southcentral, japan, south-america, europe, hong-kong
 #Regions:
 # - europe
 # - us-west
+# - ...
 
 
 # Settings database
