@@ -1,3 +1,23 @@
+luxon-server (1.5) UNRELEASED; urgency=low
+
+  * Send `Server` response header from web server
+  * Completely removed command restarter (and stubbed its FFI API)
+  * Minor lobby property optimizations
+  * Implemented AppSettings::allow_find_friends and AppSettings::allow_change_master
+  * Added license banner (can be disabled)
+  * Updated GP binary v1.6: Implement generic array element type (fixes some games)
+  * Log message on game deletion
+  * Allow list of fake regions to send to clients to be configured
+
+ -- Tuxifan <tuxifan@posteo.de>  Fri, 09 Oct 2026 20:32:00 +0200
+
+luxon-server (1.4.2) UNRELEASED; urgency=low
+
+  * Fixed critical SQL lobby issue in authorizer function
+  * Improved SQL error messages
+
+ -- Tuxifan <tuxifan@posteo.de>  Fri, 07 Aug 2026 22:46:00 +0200
+
 luxon-server (1.4.2) UNRELEASED; urgency=low
 
   * Fixed critical SQL lobby issue in authorizer function
