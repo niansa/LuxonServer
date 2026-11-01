@@ -151,7 +151,13 @@ The configuration defines the listening ports for the three main server componen
 2. **MasterServer:** Handles lobbies and matchmaking.
 3. **GameServer:** Hosts the actual room logic and relay.
 
-By default, an HTTP server is also available on port `5088` to provide a web-based dashboard for monitoring connections and server load.
+By default, an HTTP server is also available on port `5088` to provide a web-based dashboard for monitoring connections and server load.\
+
+`external_address` is meant to be set to **the IP address + ports clients would be able to reach your server at**.
+ - When playing over the internet using a publicly hosted LuxonServer, this would be your **public IP**.
+ - When playing over the LAN only, or via a VPN into a LAN network, this would be your **local IP**.
+
+`proxies` sections tell LuxonServer, that there *may* be an external proxy converting TCP connections into UDP ENet connections reachable at the specified address. If you're not running such a proxy, it is safe to simply leave these `proxies` sections as they are, or to remove them entirely.
 
 ## Usage
 
