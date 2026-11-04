@@ -86,12 +86,34 @@ If you need the absolute latest features or bug fixes that haven't been released
 * [Download from GitLab Pipelines](https://gitlab.com/luxon_project/LuxonServer/-/pipelines)
 
 ### C: Download from Debian repository
-In case you're on Debian (any arch, oldstable/stable/unstable), you can install stable Luxon Server from the Debian repository:
+In case you're on Debian (any arch, stable/unstable), you can install stable Luxon Server from the Debian repository:
 
+First, download and install the repository signing key:
+
+```bash
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://luxonserver-9065cb.gitlab.io/debian/repository-signing-key.gpg | sudo tee /etc/apt/keyrings/luxon-server.gpg > /dev/null
 ```
-# Add repository
-echo 'deb [trusted=yes] https://luxonserver-9065cb.gitlab.io/debian ./' | sudo tee /etc/apt/sources.list.d/luxon-server.list
 
+Then, add the repository for your specific Debian version:
+
+For stable/trixie:
+
+```bash
+# Add repository
+echo 'deb [signed-by=/etc/apt/keyrings/luxon-server.gpg] https://luxonserver-9065cb.gitlab.io/debian trixie main' | sudo tee /etc/apt/sources.list.d/luxon-server.list
+```
+
+For unstable:
+
+```bash
+# Add repository
+echo 'deb [signed-by=/etc/apt/keyrings/luxon-server.gpg] https://luxonserver-9065cb.gitlab.io/debian unstable main' | sudo tee /etc/apt/sources.list.d/luxon-server.list
+```
+
+And then:
+
+```bash
 # Refresh apt and install Luxon Server
 sudo apt update
 sudo apt install luxon-server
@@ -102,8 +124,6 @@ sudo systemctl restart luxon-server.service
 ```
 
 **This will most likely ONLY work with Debian, NOT any derivatives like Ubuntu!**
-
-Note that the repository is currently *unsigned* due to CI limitations I have yet to overcome. This is not normally a problem because of HTTPS. However it means that if for example the gitlab.io domain was abandoned (highly unlikely) someone could take over the repository and install malware.
 
 ### D: Build from Source
 If you prefer to compile the server yourself, plan to modify the code, or would like to use plugins you can build Luxon Server from source.
