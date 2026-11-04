@@ -402,23 +402,223 @@ strip_binaries:
 # Publish Debian packages via pages
 pages:
   stage: publish
+  needs:
+    - job: build:deb
+      artifacts: true
   image: debian:trixie
   rules:
     - if: $CI_COMMIT_TAG
   before_script:
     - apt-get update
-    - apt-get install -y dpkg-dev apt-utils
+    - apt-get install -y dpkg-dev apt-utils gzip xz-utils gnupg
   script:
-    - mkdir -p public/debian
+    - |
+      set -eu
 
-    # Gather generated .deb packages from matrix builds
-    - find debian-packages -type f -name '*.deb' -exec cp {} public/debian/ \;
+      : "${DEBIAN_REPO_GPG_PRIVATE_KEY_B64:?Missing DEBIAN_REPO_GPG_PRIVATE_KEY_B64}"
+      : "${DEBIAN_REPO_GPG_PASSPHRASE:?Missing DEBIAN_REPO_GPG_PASSPHRASE}"
+      : "${DEBIAN_REPO_GPG_FINGERPRINT:?Missing DEBIAN_REPO_GPG_FINGERPRINT}"
 
-    # Build repository indices
-    - cd public/debian
-    - dpkg-scanpackages -m . /dev/null > Packages
-    - gzip -k -9 Packages
-    - apt-ftparchive release . > Release
+      INPUT_DIR="${CI_PROJECT_DIR}/debian-packages"
+      REPO_DIR="${CI_PROJECT_DIR}/public/debian"
+
+      SUITES="trixie unstable"
+      ARCHITECTURES="amd64 arm64 i386 riscv64 ppc64el s390x"
+
+      EXPECTED_FINGERPRINT="$(
+        printf '%s' "${DEBIAN_REPO_GPG_FINGERPRINT}" |
+          tr -d '[:space:]' |
+          tr '[:lower:]' '[:upper:]'
+      )"
+
+      case "${EXPECTED_FINGERPRINT}" in
+        ''|*[!0-9A-F]*)
+          echo "ERROR: DEBIAN_REPO_GPG_FINGERPRINT is not a valid fingerprint."
+          exit 1
+          ;;
+      esac
+
+      GNUPGHOME="$(mktemp -d)"
+      export GNUPGHOME
+
+      cleanup() {
+        gpgconf --kill all >/dev/null 2>&1 || true
+        rm -rf "${GNUPGHOME}"
+      }
+      trap cleanup EXIT
+
+      chmod 700 "${GNUPGHOME}"
+
+      PRIVATE_KEY_FILE="${GNUPGHOME}/repository-private-key.asc"
+      PASSPHRASE_FILE="${GNUPGHOME}/passphrase"
+
+      umask 077
+
+      printf '%s' "${DEBIAN_REPO_GPG_PRIVATE_KEY_B64}" |
+        base64 --decode > "${PRIVATE_KEY_FILE}"
+
+      printf '%s' "${DEBIAN_REPO_GPG_PASSPHRASE}" \
+        > "${PASSPHRASE_FILE}"
+
+      chmod 600 "${PRIVATE_KEY_FILE}" "${PASSPHRASE_FILE}"
+
+      gpg --batch --import "${PRIVATE_KEY_FILE}"
+      rm -f "${PRIVATE_KEY_FILE}"
+
+      if ! gpg --batch --list-secret-keys "${EXPECTED_FINGERPRINT}" \
+          >/dev/null 2>&1; then
+        echo "ERROR: The configured private key does not contain fingerprint:"
+        echo "       ${EXPECTED_FINGERPRINT}"
+        exit 1
+      fi
+
+      ACTUAL_FINGERPRINT="$(
+        gpg \
+          --batch \
+          --with-colons \
+          --fingerprint "${EXPECTED_FINGERPRINT}" |
+          awk -F: '$1 == "fpr" { print toupper($10); exit }'
+      )"
+
+      if [ "${ACTUAL_FINGERPRINT}" != "${EXPECTED_FINGERPRINT}" ]; then
+        echo "ERROR: Imported GPG key fingerprint mismatch."
+        echo "Expected: ${EXPECTED_FINGERPRINT}"
+        echo "Actual:   ${ACTUAL_FINGERPRINT}"
+        exit 1
+      fi
+
+      echo "Using repository signing key ${ACTUAL_FINGERPRINT}"
+
+      umask 022
+
+      rm -rf "${REPO_DIR}"
+      mkdir -p "${REPO_DIR}"
+
+      gpg \
+        --batch \
+        --armor \
+        --export "${EXPECTED_FINGERPRINT}" \
+        > "${REPO_DIR}/repository-signing-key.asc"
+
+      gpg \
+        --batch \
+        --export "${EXPECTED_FINGERPRINT}" \
+        > "${REPO_DIR}/repository-signing-key.gpg"
+
+      chmod 644 \
+        "${REPO_DIR}/repository-signing-key.asc" \
+        "${REPO_DIR}/repository-signing-key.gpg"
+
+      for suite in ${SUITES}; do
+        for arch in ${ARCHITECTURES}; do
+          source_dir="${INPUT_DIR}/${suite}/${arch}"
+          pool_rel="pool/${suite}/main/${arch}"
+          index_rel="dists/${suite}/main/binary-${arch}"
+
+          if [ ! -d "${source_dir}" ]; then
+            echo "ERROR: Missing package artifacts for ${suite}/${arch}: ${source_dir}"
+            exit 1
+          fi
+
+          mkdir -p \
+            "${REPO_DIR}/${pool_rel}" \
+            "${REPO_DIR}/${index_rel}"
+
+          found=false
+
+          for deb in "${source_dir}"/*.deb; do
+            [ -f "${deb}" ] || continue
+            found=true
+
+            package_arch="$(dpkg-deb -f "${deb}" Architecture)"
+
+            case "${package_arch}" in
+              "${arch}"|all)
+                ;;
+              *)
+                echo "ERROR: ${deb} has architecture '${package_arch}', expected '${arch}' or 'all'."
+                exit 1
+                ;;
+            esac
+
+            cp -v "${deb}" "${REPO_DIR}/${pool_rel}/"
+          done
+
+          if [ "${found}" != true ]; then
+            echo "ERROR: No .deb packages found for ${suite}/${arch}."
+            exit 1
+          fi
+
+          (
+            cd "${REPO_DIR}"
+
+            dpkg-scanpackages -m "${pool_rel}" /dev/null \
+              > "${index_rel}/Packages"
+
+            test -s "${index_rel}/Packages"
+
+            gzip -n -9 -c "${index_rel}/Packages" \
+              > "${index_rel}/Packages.gz"
+
+            xz -9 -c "${index_rel}/Packages" \
+              > "${index_rel}/Packages.xz"
+          )
+        done
+      done
+
+      cd "${REPO_DIR}"
+
+      for suite in ${SUITES}; do
+        release_tmp="$(mktemp)"
+
+        apt-ftparchive \
+          -o "APT::FTPArchive::Release::Origin=${CI_PROJECT_PATH}" \
+          -o "APT::FTPArchive::Release::Label=${CI_PROJECT_PATH}" \
+          -o "APT::FTPArchive::Release::Suite=${suite}" \
+          -o "APT::FTPArchive::Release::Codename=${suite}" \
+          -o "APT::FTPArchive::Release::Architectures=${ARCHITECTURES}" \
+          -o "APT::FTPArchive::Release::Components=main" \
+          -o "APT::FTPArchive::Release::Description=${CI_PROJECT_PATH} packages for Debian ${suite}" \
+          release "dists/${suite}" > "${release_tmp}"
+
+        mv "${release_tmp}" "dists/${suite}/Release"
+
+        # Detached signature, legacy
+        gpg \
+          --batch \
+          --yes \
+          --pinentry-mode loopback \
+          --passphrase-file "${PASSPHRASE_FILE}" \
+          --local-user "${EXPECTED_FINGERPRINT}" \
+          --digest-algo SHA256 \
+          --armor \
+          --detach-sign \
+          --output "dists/${suite}/Release.gpg" \
+          "dists/${suite}/Release"
+
+        # Inline signature, modern
+        gpg \
+          --batch \
+          --yes \
+          --pinentry-mode loopback \
+          --passphrase-file "${PASSPHRASE_FILE}" \
+          --local-user "${EXPECTED_FINGERPRINT}" \
+          --digest-algo SHA256 \
+          --clearsign \
+          --output "dists/${suite}/InRelease" \
+          "dists/${suite}/Release"
+
+        gpg \
+          --batch \
+          --verify \
+          "dists/${suite}/Release.gpg" \
+          "dists/${suite}/Release"
+
+        gpg \
+          --batch \
+          --verify \
+          "dists/${suite}/InRelease"
+      done
 
   artifacts:
     paths:
