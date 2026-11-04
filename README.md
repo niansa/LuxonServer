@@ -73,6 +73,25 @@ Chat opcodes aren't implemented yet.
 
 In order to reliably connect to the server over the internet in the default configuration, the following UDP ports have to be allowed in the servers firewall / forwarded in the router the server is behind (if applicable): `5058`, `27000`, `5055`, `27001`, `5056`, `27002` (`5056-5058`, `27000-27002`)
 
+## Quick start videos
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://youtu.be/D9t_KLb4NXw">
+        <strong>Tutorial: Setting up Luxon Server on Linux VPS</strong><br><br>
+        <img src="https://img.youtube.com/vi/D9t_KLb4NXw/0.jpg" alt="Setting up Luxon Server on Linux VPS" width="400">
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://youtu.be/ljMn9udHkKk">
+        <strong>Tutorial: Setting up Luxon Server on Windows</strong><br><br>
+        <img src="https://img.youtube.com/vi/ljMn9udHkKk/0.jpg" alt="Setting up Luxon Server on Windows" width="400">
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## Getting Started
 
 There are three ways to get a build of Luxon Server: downloading a stable release, grabbing the latest CI build, or compiling it yourself. 
