@@ -252,12 +252,12 @@ For this purpose I am releasing a Luxon base mitm proxy soon that can be used to
 If that's not your thing, you can always just go ahead and test your favorite Photon-based games and [create an issue](https://github.com/niansa/LuxonServer/issues/new/choose) if something doesn't work or [report your findings to the compatibility list](https://github.com/niansa/LuxonServer/edit/master/compatibility.txt).
 
 You can email me at *`tuxifan@posteo.de`* so we can figure out a communication channel or just contact me on Discord: *`tuxifan`*, Fluxer: *`Tuxifan#1889`*, Telegram: *`@tuxifan`* or Signal: *`tuxifan.31`*\
-Alternativly you can always just [open a GitHub discussion](https://github.com/niansa/LuxonServer/discussions).
+Alternatively you can always just [open a GitHub discussion](https://github.com/niansa/LuxonServer/discussions).
 
 **Please note that using AI to contribute is advised against since it is very bad at being coherent with reverse engineering projects like this since public information often contradicts the technical reality.**\
 Additionally, AI contributions lead to low quality code that *works* but isn't well integrated and quite ugly with projects of this complexity if not baby-sitted and spoon-fed.
 
-I check PRs very thouroughly before merging them. Please be sure to check your PRs yourself before marking them as ready for review.
+I check PRs very thoroughly before merging them. If the code you contribute is visibly vibe coded, I will not accept it.
 
 ## FAQ
 
