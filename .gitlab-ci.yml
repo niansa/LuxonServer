@@ -394,6 +394,12 @@ strip_binaries:
           xz -z "$file"
         fi
       done
+      for file in build/*.pdb; do
+        if [ -f "$file" ]; then
+          echo "Compressing $file to .xz..."
+          xz -z "$file"
+        fi
+      done
   artifacts:
     paths:
       - build/luxon_server*
