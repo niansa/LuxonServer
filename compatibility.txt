@@ -40,6 +40,9 @@ PEAK
 Phasmophobia
 + Works flawlessly
 
+PULSAR: Lost Colony
++ Works flawlessly
+
 Rec Room:
 + Reported as working with NameServer rewrite plugin
 
