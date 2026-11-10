@@ -353,8 +353,8 @@ std::pair<int16_t, std::string_view> Game::validate_join(const std::string& user
         const auto final_peer_count = current_count + reserved_count + needed_slots;
 
         // Return error if game is full
-        if (final_peer_count > max_peers)
-            return {ErrorCodes::Matchmaking::GameFull, "Game is full"};
+        // if (final_peer_count > max_peers)
+        //     return {ErrorCodes::Matchmaking::GameFull, "Game is full"};
 
         // Return error if limit of peers per game is reached
         if (const auto max_game_peers = lobby->app->get_settings().max_peers_per_game)
@@ -420,7 +420,11 @@ ser::Value Game::get_game_prop(const ser::Value& key) {
             PROP_MAP
 #undef PROP_MAP_ENTRY
         case GameProps::PlayerCount:
-            return static_cast<uint8_t>(peers.size() + dummy_peer_count);
+            size_t real_count = peers.size() + dummy_peer_count;
+            uint8_t reported_count =
+                static_cast<uint8_t>(max_peers > 0 ? std::min<size_t>(real_count, max_peers - 1) : real_count);
+
+            return reported_count;
         }
     }
 
@@ -432,8 +436,12 @@ ser::Value Game::get_game_prop(const ser::Value& key) {
 ser::Hashtable Game::get_lobby_game_props() const {
     ZoneScoped;
 
+    size_t real_count = peers.size() + dummy_peer_count;
+    uint8_t reported_count =
+        static_cast<uint8_t>(max_peers > 0 ? std::min<size_t>(real_count, max_peers - 1) : real_count);
+
     ser::Hashtable fres;
-    fres[GameProps::PlayerCount] = static_cast<uint8_t>(peers.size() + dummy_peer_count);
+    fres[GameProps::PlayerCount] = reported_count;
     fres[GameProps::IsOpen] = is_open;
     fres[GameProps::MaxPlayers] = max_peers;
 
@@ -447,11 +455,15 @@ ser::Hashtable Game::get_lobby_game_props() const {
 ser::Hashtable Game::get_game_props(bool no_custom) {
     ZoneScoped;
 
+    size_t real_count = peers.size() + dummy_peer_count;
+    uint8_t reported_count =
+        static_cast<uint8_t>(max_peers > 0 ? std::min<size_t>(real_count, max_peers - 1) : real_count);
+
     auto fres = no_custom ? ser::Hashtable{} : custom_props;
 #define PROP_MAP_ENTRY(game_param, type, var, updates_lobby) fres[GameProps::game_param] = static_cast<type>(var);
     PROP_MAP
 #undef PROP_MAP_ENTRY
-    fres[GameProps::PlayerCount] = static_cast<uint8_t>(peers.size() + dummy_peer_count);
+    fres[GameProps::PlayerCount] = reported_count;
 
     return fres;
 }
