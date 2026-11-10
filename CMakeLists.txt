@@ -73,6 +73,8 @@ endif()
 
 # Linux/Windows/FreeBSD/OpenBSD/Darwin get to use sanmake, mbedtls, spdlog, multiprocessing and setting storage database support
 if (CMAKE_SYSTEM_NAME MATCHES "^(Linux|Windows|FreeBSD|OpenBSD|Darwin)$")
+    set(LUXON_ENET_SMALL_WINDOWS OFF CACHE BOOL "Use big incoming ENet windows" FORCE)
+
     add_subdirectory(Luxon)
 
     option(LUXON_SERVER_USE_SPDLOG "Use spdlog for Luxon server" ON)
@@ -82,6 +84,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "^(Linux|Windows|FreeBSD|OpenBSD|Darwin)$")
 else()
     # Compatible configuration
     set(LUXON_USE_TOMCRYPT ON CACHE BOOL "Force use of libtomcrypt" FORCE)
+    set(LUXON_ENET_SMALL_WINDOWS ON CACHE BOOL "Use small incoming ENet windows" FORCE)
 
     add_subdirectory(Luxon)
 
