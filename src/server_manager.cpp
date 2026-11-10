@@ -998,8 +998,7 @@ void ServerManager::setup() {
 
     enet::EnetPeerConfig cfg;
     cfg.time_base = enet::EnetPeer::create_time_base();
-    cfg.time_ping_interval_ms = 1000;
-    cfg.disconnect_timeout_ms = 5000;
+    cfg.max_messages_per_second = 12000;
 
     // Create servers
     for (const auto& config : configs_) {
