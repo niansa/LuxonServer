@@ -214,10 +214,11 @@ bool HttpServer::bind(const std::string& address, uint16_t port) {
     server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd_ < 0)
         return false;
-    on_create_fd(server_fd_);
+
     const int opt = 1;
     setsockopt(server_fd_, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char *>(&opt), sizeof(opt));
     set_nonblocking(server_fd_);
+
     sockaddr_in addr{};
     addr.sin_family = AF_INET;
     addr.sin_port = htons(port);
@@ -233,10 +234,14 @@ bool HttpServer::bind(const std::string& address, uint16_t port) {
         CLOSE_SOCKET(server_fd_);
         return false;
     }
+
     if (::bind(server_fd_, (struct sockaddr *)&addr, sizeof(addr)) < 0)
         return false;
     if (::listen(server_fd_, 5) < 0)
         return false;
+
+    on_create_fd(server_fd_);
+
     log_->info("Listening on http://{}:{}", address, port);
     return true;
 }
