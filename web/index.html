@@ -139,6 +139,12 @@ function safeSingleQuoteStringify(str) {
         .replace(/^"|"$/g, "'");
 }
 
+function formatBytes(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
 // Fallback for window.location.origin in older browsers like IE10
 var getOrigin = function() {
     if (!window.location.origin) {
@@ -473,6 +479,17 @@ var app = {
 
                 var masterName = masterActor ? (masterActor.user_id + ' (ID: ' + game.master_client_id + ')') : game.master_client_id;
 
+                var footprintHtml = 'N/A';
+                if (game.footprint) {
+                    var prefix = game.footprint.measurement_limit_exceeded ? '&ge; ' : '';
+                    var limitHtml = game.footprint.measurement_limit_exceeded
+                        ? ' <span style="margin-left:8px;">Measurement limit exceeded</span>'
+                        : '';
+                    footprintHtml = prefix + formatBytes(game.footprint.bytes) +
+                        ' <span style="color:var(--text-muted);">(complexity: ' + prefix + game.footprint.complexity + ')</span>' +
+                        limitHtml;
+                }
+
                 var actorRows = '<tr><td colspan="3">No actors</td></tr>';
                 if (actors && actors.length > 0) {
                     actorRows = '';
@@ -501,6 +518,7 @@ var app = {
                             '<tr><td style="border:none; padding-left:0; color:var(--brand-green);"><strong>Player TTL:</strong></td><td style="border:none;">' + game.player_ttl + 'ms</td></tr>' +
                             '<tr><td style="border:none; padding-left:0; color:var(--brand-green);"><strong>Empty TTL:</strong></td><td style="border:none;">' + game.empty_room_ttl + 'ms</td></tr>' +
                             '<tr><td style="border:none; padding-left:0; color:var(--brand-green);"><strong>Flags:</strong></td><td style="border:none;">' + game.flags + '</td></tr>' +
+                            '<tr><td style="border:none; padding-left:0; color:var(--brand-green);"><strong>Footprint:</strong></td><td style="border:none;">' + footprintHtml + '</td></tr>' +
                         '</table>' +
                         '<h3 style="margin-top:1rem; padding-bottom:0.5rem; border-bottom:1px solid var(--border-color);">Properties</h3>' +
                         '<pre class="json-dump" style="margin-top:10px;">' + safeSingleQuoteStringify(game.full_props, null, 2) + '</pre>' +

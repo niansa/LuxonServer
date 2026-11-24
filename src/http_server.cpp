@@ -775,14 +775,21 @@ json HttpServer::route_request(std::string_view method, std::string path) {
                 throw std::out_of_range("Game expired");
 
             // /apps/{app}/games/{game_id}
-            if (segs.size() == 4)
+            if (segs.size() == 4) {
+                const auto footprint =
+                    game->measure_footprint(FootprintLimits{.max_bytes = 1000000, .max_complexity = 50000});
                 return {{"id", game->id},
                         {"master_client_id", game->master_actor},
                         {"player_ttl", game->player_ttl},
                         {"empty_room_ttl", game->empty_game_ttl},
                         {"flags", game->flags},
                         {"expected_users", game->expected_users},
-                        {"full_props", json_conv::photon_hash_to_json(game->get_game_props())}};
+                        {"full_props", json_conv::photon_hash_to_json(game->get_game_props())},
+                        {"footprint",
+                         {{"bytes", footprint.bytes},
+                          {"complexity", footprint.complexity},
+                          {"measurement_limit_exceeded", footprint.limit_exceeded}}}};
+            }
 
             // /apps/{app}/games/{game_id}/actors
             if (segs.size() == 5 && segs[4] == "actors") {

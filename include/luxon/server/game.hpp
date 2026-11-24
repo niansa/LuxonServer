@@ -219,6 +219,12 @@ struct Game : std::enable_shared_from_this<Game> {
     void trigger_lobby_update();
 
     ///
+    /// \brief Measures footprint of all dynamic data
+    /// \return Measured footprint
+    ///
+    ser::Footprint measure_footprint(ser::FootprintLimits limits = {}) const;
+
+    ///
     /// \brief Gets well-known or custom game property
     /// \param key Property to get
     /// \return Value of property, null-value if not found

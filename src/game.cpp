@@ -398,6 +398,71 @@ void Game::trigger_lobby_update() {
 #endif
 }
 
+ser::Footprint Game::measure_footprint(ser::FootprintLimits limits) const {
+    ZoneScoped;
+
+    ser::Footprint fres{};
+
+    const auto add_bytes = [&](std::size_t bytes) {
+        fres.bytes += bytes;
+        if (fres.bytes > limits.max_bytes)
+            fres.limit_exceeded = true;
+        return !fres.limit_exceeded;
+    };
+
+    const auto add_footprint = [&](const ser::Footprint& fp) {
+        fres.bytes += fp.bytes;
+        fres.complexity += fp.complexity;
+        if (fp.limit_exceeded || fres.bytes > limits.max_bytes || fres.complexity > limits.max_complexity)
+            fres.limit_exceeded = true;
+        return !fres.limit_exceeded;
+    };
+
+    const auto remaining_limits = [&]() -> ser::FootprintLimits {
+        return {
+            .max_bytes = limits.max_bytes - fres.bytes,
+            .max_complexity = limits.max_complexity - fres.complexity,
+        };
+    };
+
+    // Strings
+    if (!add_bytes(id.size() + lobby_props.capacity() * sizeof(std::string)))
+        return fres;
+    for (const auto& user_id : expected_users)
+        if (!add_bytes(sizeof(std::string) + user_id.size()))
+            return fres;
+    for (const auto& prop : lobby_props)
+        if (!add_bytes(prop.size()))
+            return fres;
+
+    // Game and actor properties
+    if (!custom_props.empty() && !add_footprint(ser::Value::measure_footprint(custom_props, remaining_limits())))
+        return fres;
+    for (const auto& game_peer : peers)
+        if (!game_peer.actor_props.empty() &&
+            !add_footprint(ser::Value::measure_footprint(game_peer.actor_props, remaining_limits())))
+            return fres;
+
+    // Cached events
+    if (!add_bytes(event_cache.size() * sizeof(Event)))
+        return fres;
+    for (const auto& event : event_cache) {
+        bool has_cached = false;
+        for (const auto& cache : event.cached_data) {
+            if (!cache.empty()) {
+                has_cached = true;
+                if (!add_bytes(cache.size()))
+                    return fres;
+            }
+        }
+        if (!has_cached)
+            if (!event.data.is_null() && !add_footprint(event.data.measure_footprint(remaining_limits())))
+                return fres;
+    }
+
+    return fres;
+}
+
 #define PROP_MAP                                                                                                                                               \
     PROP_MAP_ENTRY(MaxPlayers, uint8_t, max_peers, true);                                                                                                      \
     PROP_MAP_ENTRY(IsVisible, bool, is_visible, false);                                                                                                        \
