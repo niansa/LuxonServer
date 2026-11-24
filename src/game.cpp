@@ -493,7 +493,7 @@ void Game::insert_game_props(ser::Hashtable update) {
             }
         } else {
             // Update custom props
-            if (!key.is_null())
+            if (!value.is_null())
                 custom_props[key] = value;
             else if (delete_null)
                 if (auto res = custom_props.find(key); res != custom_props.end())
@@ -547,7 +547,7 @@ bool Game::insert_actor_props(int32_t actor_id, const ser::Hashtable& update) {
 
     const bool delete_null = flags & GameFlags::DeleteNullProps;
     for (const auto& [key, value] : update) {
-        if (!key.is_null())
+        if (!value.is_null())
             actor_props[key] = value;
         else if (delete_null)
             if (auto res = actor_props.find(key); res != actor_props.end())
