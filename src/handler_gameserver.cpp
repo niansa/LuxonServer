@@ -36,10 +36,10 @@ using JoinOrCreateGame = Model<Parameter<std::string, GameAndActor::GameId>, Par
                                Parameter<bool, GameSettings::CheckUserOnJoin, true>, Parameter<bool, RoutingAndEvents::SuppressRoomEvents, true>,
                                Parameter<bool, RoutingAndEvents::PublishUserId, true>>;
 
-using SetProperties =
-    Model<Parameter<ser::HashtablePtr, Properties::Properties, false, DefaultInit>,
-          Parameter<ser::HashtablePtr, Properties::ExpectedValues, false, DefaultInit>, Parameter<bool, RoutingAndEvents::Broadcast, false, DefaultConst<true>>,
-          Parameter<int32_t, GameAndActor::ActorNo, false, DefaultConst<0>>>;
+using SetProperties = Model<Parameter<ser::HashtablePtr, Properties::Properties, false>,
+                            Parameter<ser::HashtablePtr, Properties::ExpectedValues, false, DefaultInit>,
+                            Parameter<bool, RoutingAndEvents::Broadcast, false, DefaultConst<true>>,
+                            Parameter<int32_t, GameAndActor::ActorNo, false, DefaultConst<0>>>;
 
 using ChangeInterestGroups = Model<Parameter<ser::ByteArray, RoutingAndEvents::Add, true>, Parameter<ser::ByteArray, RoutingAndEvents::Remove, true>>;
 } // namespace models
@@ -560,12 +560,21 @@ Awaitable<> GameServerHandler::HandleOperationRequest(ser::OperationRequestMessa
                 if (props_expected)
                     ok = game->expect_actor_props(actor_id, *props_expected);
                 if (ok)
-                    game->insert_actor_props(actor_id, *props);
+                    ok = game->insert_actor_props(actor_id, *props);
             } else {
                 if (props_expected)
                     ok = game->expect_game_props(*props_expected);
                 if (ok)
                     game->insert_game_props(*props);
+            }
+
+            // Check for bad actor
+            if (!ok && !game->find_peer(actor_id)) {
+                const ser::OperationResponseMessage resp{.operation_code = req.operation_code,
+                                                         .return_code = ErrorCodes::Core::OperationInvalid,
+                                                         .debug_message = "Given actor does not exist"};
+                send(proto_->Serialize(resp));
+                lco_return;
             }
 
             // Emtpy response
@@ -595,6 +604,9 @@ Awaitable<> GameServerHandler::HandleOperationRequest(ser::OperationRequestMessa
 
         case OpCodes::Lite::ChangeInterestGroups: {
             ZoneScopedN("HandleOperationRequest_ChangeInterestGroups");
+
+            if (!ensure_joined_state())
+                lco_return;
 
             const auto params = models::ChangeInterestGroups::decode(req);
             if (!params) {

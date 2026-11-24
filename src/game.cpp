@@ -560,7 +560,11 @@ bool Game::insert_actor_props(int32_t actor_id, const ser::Hashtable& update) {
 bool Game::expect_actor_props(int32_t actor_id, const ser::Hashtable& expected) {
     ZoneScoped;
 
-    const auto& actor_props = find_peer(actor_id)->actor_props;
+    auto *game_peer = find_peer(actor_id);
+    if (!game_peer)
+        return false;
+
+    const auto& actor_props = game_peer->actor_props;
     for (const auto& [key, value] : expected)
         if ((!actor_props.contains(key) && (!value.is_null() || !(flags & GameFlags::DeleteNullProps))) || actor_props.at(key) != value)
             return false;
