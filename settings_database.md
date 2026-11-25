@@ -27,6 +27,12 @@ This table stores the core configuration settings for each application managed b
 * **`max_peers`** (INTEGER): The maximum number of concurrent users (peers) allowed across the entire application. It defaults to `0` (infinite).
 * **`max_peers_per_game`** (INTEGER): The maximum number of users allowed within a single game session. It defaults to `0` (255).
 * **`max_game_count`** (INTEGER): The maximum number of active game sessions allowed at one time. It defaults to `0` (infinite).
+* **`max_room_footprint_bytes`** (INTEGER): The maximum allowed footprint in bytes for a single room. `NULL` (default) inherits the global `MaxRoomFootprintBytes` setting, and `0` disables the limit (infinite).
+* **`max_room_footprint_complexity`** (INTEGER): The maximum allowed footprint complexity for a single room. `NULL` (default) inherits the global `MaxRoomFootprintComplexity` setting, and `0` disables the limit (infinite).
+* **`max_room_footprint_exceed_action`** (INTEGER): Defines the action taken when a room exceeds its footprint limits. `NULL` (default) or `0` inherits the global `MaxRoomFootprintExceedKill` configuration.
+    * `0` = Default: Uses the global configuration
+    * `1` = CloseRoom: Closes the room
+    * `2` = KillRoom: Kills the room
 
 ### 2. `auth_providers`
 This table configures third-party or custom authentication providers linked to specific applications.

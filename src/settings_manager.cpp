@@ -48,6 +48,13 @@ const std::vector<Migration> MIGRATIONS = {
     // Migration 2
     {2, R"(
         ALTER TABLE app_settings ADD COLUMN allow_change_master INTEGER NOT NULL DEFAULT 1;
+    )"},
+
+    // Migration 3
+    {3, R"(
+        ALTER TABLE app_settings ADD COLUMN max_room_footprint_bytes INTEGER;
+        ALTER TABLE app_settings ADD COLUMN max_room_footprint_complexity INTEGER;
+        ALTER TABLE app_settings ADD COLUMN max_room_footprint_exceed_action INTEGER;
     )"}};
 } // anonymous namespace
 
@@ -177,8 +184,11 @@ std::optional<AppSettings> SettingsManager::get_app_settings(const std::string& 
     sqlite3pp::query q(*db_, "SELECT auth_mode, allow_find_friends, "
                              "custom_anonymous_uid_mode, "
                              "anonymous_uid_prefix, max_peers, "
-                             "max_peers_per_game, max_game_count,"
-                             "allow_change_master "
+                             "max_peers_per_game, max_game_count, "
+                             "allow_change_master, "
+                             "max_room_footprint_bytes, "
+                             "max_room_footprint_complexity, "
+                             "max_room_footprint_exceed_action "
                              "FROM app_settings WHERE appid = ?");
     q.bind(1, appid.c_str(), sqlite3pp::copy_semantic::nocopy);
 
@@ -192,14 +202,20 @@ std::optional<AppSettings> SettingsManager::get_app_settings(const std::string& 
     AppSettings settings;
     settings.appid = appid;
 
-    settings.auth_mode = (*it).get<int>(0);
+    settings.auth_mode = std::clamp((*it).get<int>(0), 0, 2);
     settings.allow_find_friends = (*it).get<int>(1) != 0;
     settings.custom_anonymous_uid_mode = std::clamp((*it).get<int>(2), 0, 2);
     settings.anonymous_uid_prefix = (*it).get<std::string>(3);
     settings.max_peers = (*it).get<int>(4);
     settings.max_peers_per_game = (*it).get<int>(5);
     settings.max_game_count = (*it).get<int>(6);
-    settings.allow_change_master = (*it).get<int>(7);
+    settings.allow_change_master = (*it).get<int>(7) != 0;
+    if ((*it).column_type(8) != SQLITE_NULL)
+        settings.max_room_footprint_bytes = std::max((*it).get<int>(8), 0);
+    if ((*it).column_type(9) != SQLITE_NULL)
+        settings.max_room_footprint_complexity = std::max((*it).get<int>(9), 0);
+    if ((*it).column_type(10) != SQLITE_NULL)
+        settings.max_room_footprint_exceed_action = std::clamp((*it).get<int>(10), 0, 2);
 
     return settings;
 }

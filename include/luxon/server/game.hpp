@@ -120,12 +120,14 @@ struct Game : std::enable_shared_from_this<Game> {
     uint8_t flags = 3; // CheckUserOnJoin | DeleteCacheOnLeave
     bool is_created = false;
     bool is_open = true;
+    bool is_force_closed = false;
     bool is_visible = true;
     int32_t player_ttl = 0;
     int32_t empty_game_ttl = 0;
     uint8_t max_peers = 0;
     int32_t master_actor = 1;
     int32_t last_actor_id = 0;
+    bool footprint_limit_exceeded = false;
     std::unordered_set<std::string> expected_users;
     ser::Hashtable custom_props;
     std::vector<std::string> lobby_props;
@@ -160,6 +162,15 @@ struct Game : std::enable_shared_from_this<Game> {
     /// \return True if info is for this game
     ///
     bool matches_game_info(const GameInfo& info) const;
+
+    ///
+    /// \brief Closes game and disconnects all peers.
+    ///
+    void kill();
+    ///
+    /// \brief Forces game to be closed and be unable to be re-opened.
+    ///
+    void force_close();
 
     ///
     /// \brief Creates a GamePeer that can later be added to the game
@@ -223,6 +234,10 @@ struct Game : std::enable_shared_from_this<Game> {
     /// \return Measured footprint
     ///
     ser::Footprint measure_footprint(ser::FootprintLimits limits = {}) const;
+    ///
+    /// \brief Checks if configured footprint limits have been exceeded and handles the condition
+    ///
+    void check_footprint_limits(const std::shared_ptr<logger>& logger);
 
     ///
     /// \brief Gets well-known or custom game property

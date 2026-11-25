@@ -38,8 +38,16 @@ size_t LobbyIdHash::operator()(const LobbyId& k) const noexcept {
 }
 
 void AppSettings::enforce_global_config(ServerManager& server_manager) {
-    if (const uint8_t global_max_game_peers = server_manager.get_max_game_peers())
-        max_peers_per_game = (max_peers_per_game == 0) ? global_max_game_peers : std::min<unsigned>(max_peers_per_game, global_max_game_peers);
+    const auto apply_default = [](unsigned& value, unsigned global_default, unsigned sentinel = 0) {
+        if (value == sentinel)
+            value = global_default;
+    };
+
+    apply_default(max_peers_per_game, server_manager.get_max_game_peers());
+    apply_default(max_room_footprint_bytes, server_manager.get_max_room_footprint_bytes(), InheritGlobal);
+    apply_default(max_room_footprint_complexity, server_manager.get_max_room_footprint_complexity(), InheritGlobal);
+    apply_default(max_room_footprint_exceed_action,
+                  server_manager.get_max_room_footprint_exceed_kill() ? KillRoom : CloseRoom, Default);
 }
 
 App::App(ServerManager& server_manager, std::string_view id, std::string_view version) : server_manager(server_manager), id(id), version(version) {}

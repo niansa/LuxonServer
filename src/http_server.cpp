@@ -861,7 +861,7 @@ json HttpServer::route_request(std::string_view method, std::string path) {
                         res.push_back({{"id", g->id},
                                        {"player_count", g->peers.size()},
                                        {"max_players", g->max_peers},
-                                       {"is_open", g->is_open},
+                                       {"is_open", g->is_open && !g->is_force_closed},
                                        {"is_visible", g->is_visible},
                                        {"lobby_props", json_conv::photon_hash_to_json(g->get_lobby_game_props())}});
                     }

@@ -279,9 +279,11 @@ Awaitable<> GameServerHandler::HandleOperationRequest(ser::OperationRequestMessa
 
             // Add To Cache
             const bool can_cache = (cache_op == CacheOperation::AddToRoomCache || cache_op == CacheOperation::AddToRoomCacheGlobal);
-            if (can_cache && params->get<ActorList>() == nullptr &&
+            const bool does_cache =
+                can_cache && params->get<ActorList>() == nullptr &&
                 params->get<DictKeyCodes::RoutingAndEvents::ReceiverGroup>() != ReceiverGroup::MasterClient &&
-                params->get<DictKeyCodes::RoutingAndEvents::InterestGroup>() == 0) {
+                params->get<DictKeyCodes::RoutingAndEvents::InterestGroup>() == 0;
+            if (does_cache) {
                 // Make copy to allow potential change below to happen non-destructively
                 Event cached_copy = event;
 
@@ -293,6 +295,8 @@ Awaitable<> GameServerHandler::HandleOperationRequest(ser::OperationRequestMessa
 
             // Broadcast
             game->broadcast_event(event);
+            if (does_cache)
+                game->check_footprint_limits(peer_->log);
             lco_return;
         }
 
@@ -490,6 +494,7 @@ Awaitable<> GameServerHandler::HandleOperationRequest(ser::OperationRequestMessa
             // Flood the client with current state
             game->flood_peer(game_peer_);
 
+            game->check_footprint_limits(peer_->log);
             lco_return;
         }
 
@@ -598,6 +603,8 @@ Awaitable<> GameServerHandler::HandleOperationRequest(ser::OperationRequestMessa
                 if (res == Result::Fail)
                     peer_->log->error("Plugin reported error for SetProperties after properties were already set");
             });
+
+            game->check_footprint_limits(peer_->log);
 
             lco_return;
         }

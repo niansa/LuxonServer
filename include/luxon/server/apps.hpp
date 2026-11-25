@@ -47,6 +47,9 @@ struct AppSettings {
 
     enum AuthMode : unsigned { Weak, Anonymous, Strict };
     enum CustomAnonymousUIDMode : unsigned { Allow, AllowWithPrefix, ForceRandom };
+    enum MaxRoomFootprintExceedAction : unsigned { Default, CloseRoom, KillRoom };
+
+    static constexpr unsigned InheritGlobal = ~0u;
 
     std::string appid;
     unsigned auth_mode = Weak;
@@ -55,6 +58,10 @@ struct AppSettings {
     unsigned max_peers = 0, max_peers_per_game = 0, max_game_count = 0;
 
     bool allow_find_friends = true, allow_change_master = true;
+
+    unsigned max_room_footprint_bytes = InheritGlobal;
+    unsigned max_room_footprint_complexity = InheritGlobal;
+    unsigned max_room_footprint_exceed_action = Default;
 
     void enforce_global_config(ServerManager&);
 };

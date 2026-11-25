@@ -444,6 +444,12 @@ ServerManagerConfig ServerManager::parse_config(const std::string& config_conten
             config.max_game_peers = ReadNodeScalar<unsigned>(section, "MaxGamePeers");
         } else if (key == "TickTimeBudget") {
             config.tick_time_budget = ReadNodeScalar<uint32_t>(section, "TickTimeBudget");
+        } else if (key == "MaxRoomFootprintBytes") {
+            config.max_room_footprint_bytes = ReadNodeScalar<unsigned>(section, "MaxRoomFootprintBytes");
+        } else if (key == "MaxRoomFootprintComplexity") {
+            config.max_room_footprint_complexity = ReadNodeScalar<unsigned>(section, "MaxRoomFootprintComplexity");
+        } else if (key == "MaxRoomFootprintExceedKill") {
+            config.max_room_footprint_exceed_kill = ReadNodeScalar<bool>(section, "MaxRoomFootprintExceedKill");
         } else if (key == "Regions") {
             ExpectSequence(section, "Regions");
             for (auto itemIt = section.Begin(); itemIt != section.End(); itemIt++)
@@ -548,6 +554,9 @@ ServerManager::ServerManager(ServerManagerConfig config
     tick_time_budget_ = config.tick_time_budget;
     if (tick_time_budget_ == 0)
         tick_time_budget_ = ~tick_time_budget_;
+    max_room_footprint_bytes_ = config.max_room_footprint_bytes;
+    max_room_footprint_complexity_ = config.max_room_footprint_complexity;
+    max_room_footprint_exceed_kill_ = config.max_room_footprint_exceed_kill;
 
     if (config.regions.empty()) {
         regions_ = {"asia", "au", "cae", "cn", "eu", "hk", "in", "jp", "za", "sa", "kr", "tr", "uae", "us", "usw", "ussc"};
@@ -1182,6 +1191,9 @@ void ServerManager::setup_subprocess(const ServerConfig& config) {
     child_config.max_connections = max_connections_;
     child_config.max_game_peers = max_game_peers_;
     child_config.tick_time_budget = tick_time_budget_;
+    child_config.max_room_footprint_bytes = max_room_footprint_bytes_;
+    child_config.max_room_footprint_complexity = max_room_footprint_complexity_;
+    child_config.max_room_footprint_exceed_kill = max_room_footprint_exceed_kill_;
 #ifdef LUXON_SERVER_ENABLE_SETTINGS_DATABASE
     if (!settings_database_path.empty())
         child_config.settings_database_path = settings_database_path + ":ro";

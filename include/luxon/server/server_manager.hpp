@@ -105,6 +105,21 @@ struct ServerManagerConfig {
     ///
     uint32_t tick_time_budget = 2000;
 
+    ///
+    /// \brief Maximum room footprint in bytes (0 = unlimited)
+    ///
+    unsigned max_room_footprint_bytes = 750000;
+
+    ///
+    /// \brief Maximum room footprint complexity (0 = unlimited)
+    ///
+    unsigned max_room_footprint_complexity = 75000;
+
+    ///
+    /// \brief Whether to kill rooms that exceed footprint limits instead of closing them
+    ///
+    bool max_room_footprint_exceed_kill = false;
+
 #ifdef LUXON_SERVER_ENABLE_SETTINGS_DATABASE
     ///
     /// \brief Settings database file path
@@ -218,6 +233,9 @@ private:
     unsigned max_connections_ = 0;
     uint8_t max_game_peers_ = 0;
     uint32_t tick_time_budget_ = 2000;
+    unsigned max_room_footprint_bytes_ = 750000;
+    unsigned max_room_footprint_complexity_ = 75000;
+    bool max_room_footprint_exceed_kill_ = false;
 
     void setup();
 #ifdef LUXON_SERVER_ENABLE_MULTIPROCESSING
@@ -462,6 +480,19 @@ public:
     /// \brief Gets the maximum allowed peers per game
     ///
     uint8_t get_max_game_peers() const { return max_game_peers_; }
+
+    ///
+    /// \brief Gets the maximum allowed room footprint in bytes
+    ///
+    unsigned get_max_room_footprint_bytes() const { return max_room_footprint_bytes_; }
+    ///
+    /// \brief Gets the maximum allowed room footprint complexity
+    ///
+    unsigned get_max_room_footprint_complexity() const { return max_room_footprint_complexity_; }
+    ///
+    /// \brief Gets whether exceeding the room footprint limit kills the room
+    ///
+    bool get_max_room_footprint_exceed_kill() const { return max_room_footprint_exceed_kill_; }
 
     ///
     /// \brief Gets list of servers

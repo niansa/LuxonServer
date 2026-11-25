@@ -115,6 +115,41 @@ bool Game::matches_game_info(const GameInfo& info) const {
     return true;
 }
 
+void Game::kill() {
+    ZoneScoped;
+
+    // Make game invisible
+    if (is_visible) {
+        is_visible = false;
+        for (auto& handler : lobby->game_list_update_handlers)
+            handler.game_delete(this);
+    }
+
+    // Force the game to close
+    force_close();
+
+    // Disconnect all peers
+    std::vector<std::shared_ptr<Peer>> peers_to_disconnect;
+    peers_to_disconnect.reserve(peers.size());
+    for (auto& game_peer : peers)
+        if (auto peer = game_peer.peer.lock())
+            peers_to_disconnect.push_back(std::move(peer));
+
+    for (auto& peer : peers_to_disconnect)
+        peer->disconnect();
+}
+
+void Game::force_close() {
+    is_force_closed = true;
+    is_open = false;
+    trigger_lobby_update();
+
+    ser::Hashtable close_props{{GameProps::IsOpen, false}};
+    auto prop_event = create_property_update_event(0, std::move(close_props));
+    prop_event.receivers = ReceiverGroup::All;
+    broadcast_event(prop_event);
+}
+
 GamePeer Game::create_peer(std::shared_ptr<Peer> peer) {
     ZoneScoped;
 
@@ -215,7 +250,7 @@ restart:
 
     if (peers.empty()) {
         // Lobby is empty now, use a scheduled tasks to stay alive for at least empty_game_ttl milliseconds
-        if (empty_game_ttl > 0)
+        if (empty_game_ttl > 0 && !is_force_closed)
             lobby->app->server_manager.add_scheduled_task(empty_game_ttl, [game = shared_from_this()]() {});
 
         // Call into plugins
@@ -335,7 +370,7 @@ std::pair<int16_t, std::string_view> Game::validate_join(const std::string& user
         return {ErrorCodes::Matchmaking::GameIdNotExists, "Game does not exist"};
 
     // Return error if game is closed
-    if (!is_open)
+    if (!is_open || is_force_closed)
         return {ErrorCodes::Matchmaking::GameClosed, "Game is closed"};
 
     // Check capacity (peers + expected users)
@@ -463,6 +498,46 @@ ser::Footprint Game::measure_footprint(ser::FootprintLimits limits) const {
     return fres;
 }
 
+void Game::check_footprint_limits(const std::shared_ptr<logger>& logger) {
+    if (footprint_limit_exceeded)
+        return;
+
+    // Check footprint limits
+    const auto& app_settings = lobby->app->get_settings();
+    if (app_settings.max_room_footprint_bytes || app_settings.max_room_footprint_complexity) {
+        ser::FootprintLimits footprint_limits{};
+        if (app_settings.max_room_footprint_bytes)
+            footprint_limits.max_bytes = app_settings.max_room_footprint_bytes;
+        if (app_settings.max_room_footprint_complexity)
+            footprint_limits.max_complexity = app_settings.max_room_footprint_complexity;
+
+        const auto footprint = measure_footprint(footprint_limits);
+        if (footprint.limit_exceeded) {
+            footprint_limit_exceeded = true;
+
+            logger->warn("Game '{}' exceeded room footprint limits (bytes={}, complexity={})", id, footprint.bytes,
+                         footprint.complexity);
+
+            // Notify clients
+            Event error_event{
+                .code = EventCodes::Error,
+                .sender_actor_id = 0,
+                .receivers = ReceiverGroup::All,
+            };
+            error_event.top_params[DictKeyCodes::LoadBalancing::Info] =
+                std::string("Room closed because of exceeding footprint limits");
+            broadcast_event(error_event);
+
+            if (app_settings.max_room_footprint_exceed_action == AppSettings::KillRoom)
+                kill();
+            else
+                force_close();
+
+            return;
+        }
+    }
+}
+
 #define PROP_MAP                                                                                                                                               \
     PROP_MAP_ENTRY(MaxPlayers, uint8_t, max_peers, true);                                                                                                      \
     PROP_MAP_ENTRY(IsVisible, bool, is_visible, false);                                                                                                        \
@@ -478,6 +553,9 @@ ser::Value Game::get_game_prop(const ser::Value& key) {
     bool update_lobby = false;
 
     if (key.is<uint8_t>()) {
+        if (key.get<uint8_t>() == GameProps::IsOpen && is_force_closed)
+            return false;
+
         switch (key.get<uint8_t>()) {
 #define PROP_MAP_ENTRY(game_param, type, var, updates_lobby)                                                                                                   \
     case GameProps::game_param:                                                                                                                                \
@@ -506,6 +584,9 @@ ser::Hashtable Game::get_lobby_game_props() const {
         if (custom_props.contains(key))
             fres.emplace(key, custom_props.at(key));
 
+    if (is_force_closed)
+        fres[GameProps::IsOpen] = false;
+
     return fres;
 }
 
@@ -517,6 +598,9 @@ ser::Hashtable Game::get_game_props(bool no_custom) {
     PROP_MAP
 #undef PROP_MAP_ENTRY
     fres[GameProps::PlayerCount] = static_cast<uint8_t>(peers.size() + dummy_peer_count);
+
+    if (is_force_closed)
+        fres[GameProps::IsOpen] = false;
 
     return fres;
 }
@@ -541,17 +625,21 @@ void Game::insert_game_props(ser::Hashtable update) {
         if (key.is<uint8_t>()) {
             // Update built in props
             switch (key.get<uint8_t>()) {
-#define PROP_MAP_ENTRY(game_param, type, var, updates_lobby)                                                                                                   \
-    case GameProps::game_param:                                                                                                                                \
-        /* Delete game from lobby list if freshly made invisible */                                                                                            \
-        if constexpr (GameProps::game_param == GameProps::IsVisible)                                                                                           \
-            if (is_visible && value.is<bool>())                                                                                                                \
-                delete_from_lobby = !value.get<bool>();                                                                                                        \
-        /* If changing master isn't allowed, just ignore the attempt */                                                                                        \
-        if constexpr (GameProps::game_param == GameProps::MasterClientId)                                                                                      \
-            if (!lobby->app->get_settings().allow_change_master)                                                                                               \
-                break;                                                                                                                                         \
-        update_lobby |= value.store_if<type>(var) && updates_lobby;                                                                                            \
+#define PROP_MAP_ENTRY(game_param, type, var, updates_lobby)                                                           \
+    case GameProps::game_param:                                                                                        \
+        /* Delete game from lobby list if freshly made invisible */                                                    \
+        if constexpr (GameProps::game_param == GameProps::IsVisible)                                                   \
+            if (is_visible && value.is<bool>())                                                                        \
+                delete_from_lobby = !value.get<bool>();                                                                \
+        /* If changing master isn't allowed, just ignore the attempt */                                                \
+        if constexpr (GameProps::game_param == GameProps::MasterClientId)                                              \
+            if (!lobby->app->get_settings().allow_change_master)                                                       \
+                break;                                                                                                 \
+        /* If game is force closed, just ignore the attempt */                                                         \
+        if constexpr (GameProps::game_param == GameProps::IsOpen)                                                      \
+            if (is_force_closed)                                                                                       \
+                break;                                                                                                 \
+        update_lobby |= value.store_if<type>(var) && updates_lobby;                                                    \
         break;
                 PROP_MAP
 #undef PROP_MAP_ENTRY
